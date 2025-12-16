@@ -1,0 +1,120 @@
+/* ================================
+   Global Company Page Styling
+================================ */
+.company-hero {
+    padding: 100px 20px;
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: rgb(186, 124, 124);
+    text-align: center;
+    border-radius: 0 0 30px 30px;
+    animation: fadeIn 1s ease;
+}
+
+.company-hero h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 15px;
+}
+
+.company-hero p {
+    font-size: 1.25rem;
+    opacity: 0.9;
+}
+
+/* ================================
+   Content Container
+================================ */
+.company-container {
+    width: 100%;
+    margin: 40px 0;
+    padding: 25px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    animation: slideUp 0.8s ease;
+}
+
+.company-container h2 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #0d47a1;
+}
+
+.company-container p,
+.company-container li {
+    font-size: 1.1rem;
+    line-height: 1.7;
+}
+
+.company-container ul {
+    padding-left: 20px;
+}
+
+.company-section {
+    margin-bottom: 40px;
+}
+
+/* ================================
+   Cards for Achievements
+================================ */
+.achievement-card {
+    background: #f7faff;
+    padding: 20px;
+    border-left: 4px solid #1a73e8;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    animation: fadeInUp 0.8s ease;
+}
+
+.achievement-card h3 {
+    margin-bottom: 5px;
+    color: #1a73e8;
+}
+
+/* ================================
+   Contact Section Styling
+================================ */
+.contact-list {
+    list-style: none;
+    padding: 0;
+}
+
+.contact-list li {
+    margin-bottom: 10px;
+    font-size: 1.2rem;
+}
+
+.contact-list i {
+    color: #1a73e8;
+    margin-right: 10px;
+}
+
+/* ================================
+   Animations
+================================ */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* ================================
+   Responsive
+================================ */
+@media (max-width: 768px) {
+    .company-hero h1 {
+        font-size: 2.3rem;
+    }
+    .company-container {
+        padding: 20px;
+    }
+}
