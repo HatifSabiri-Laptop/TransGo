@@ -1,7 +1,26 @@
+<style>
+    @media (max-width: 768px) {
+        .nav-menu {
+            left: -100%;
+            transition: left 0.3s;
+        }
+
+        .nav-menu.active {
+            left: 0 !important;
+        }
+
+        .nav-toggle {
+            display: flex !important;
+        }
+    }
+</style>
 <?php
+
 $page_title = 'Beranda';
 include 'includes/header.php';
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/config/database.php';
+
 $conn = getDBConnection();
 
 // Get statistics
@@ -9,173 +28,112 @@ $total_services = $conn->query("SELECT COUNT(*) as count FROM services WHERE sta
 $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fetch_assoc()['count'];
 ?>
 
+<style>
+    /* inline styles in index.php */
+    .hero {
+        background: linear-gradient(135deg, rgba(150, 235, 210, 0.95), rgba(102, 226, 185, 0.95)),
+            url('assets/images/hero-bus.jpg') center/cover !important;
+        display: flex !important;
+        align-items: center !important;
+        position: relative !important;
+        min-height: 100vh !important;
+        height: auto !important;
+    }
+
+    .hero-content {
+        position: relative !important;
+        z-index: 2 !important;
+        width: 100% !important;
+        text-align: center !important;
+        padding: 0 2rem !important;
+        margin: 0 auto !important;
+    }
+
+    @media (max-width: 768px) {
+        .hero-buttons .btn {
+            padding: 1rem 1.5rem !important;
+            font-size: 1rem !important;
+            border-radius: 25px !important;
+            width: 100% !important;
+            max-width: 280px !important;
+            margin: 0 auto;
+        }
+
+        .hero-content>div:last-of-type>div h3 {
+            font-size: 1.75rem !important;
+        }
+    }
+</style>
 <!-- Hero Section -->
-<section class="hero"
-    style="background: linear-gradient(135deg, rgba(167, 187, 230, 0.95), rgba(102, 226, 185, 0.95)), 
-    url('assets/images/hero-bus.jpg') center/cover; 
-    height: 120vh; display: flex; align-items: center; position: relative;">
+<section class="hero">
+    <div class="hero-overlay"></div>
 
-    <div class="hero-overlay"
-        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4);">
-    </div>
-
-    <div class="hero-content"
-        style="position: relative; z-index: 2; width: 100%; text-align: center; padding: 0 2rem;">
-
-        <div style="animation: fadeInDown 1s;">
-            <i class="fas fa-bus"
-                style="font-size: 4rem; color: white; margin-bottom: 2rem; display: inline-block;">
-            </i>
+    <div class="hero-content">
+        <div class="hero-icon-wrapper">
+            <i class="fas fa-bus"></i>
         </div>
 
-        <h1 class="hero-title"
-            style="font-size: 4rem; font-weight: 800; color: white; margin-bottom: 1.5rem; 
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.3); animation: fadeInUp 1s 0.2s both; line-height: 1.2;">
+        <h1 class="hero-title">
             Perjalanan Nyaman<br>Dimulai Dari Sini
         </h1>
 
-        <p class="hero-subtitle"
-            style="font-size: 1.5rem; color: rgba(255,255,255,0.95); margin-bottom: 3rem; 
-           animation: fadeInUp 1s 0.4s both; max-width: 700px; margin-left: auto; margin-right: auto;">
+        <p class="hero-subtitle">
             Booking tiket transportasi dengan mudah, cepat, dan aman
         </p>
 
-        <div class="hero-buttons"
-            style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; 
-             animation: fadeInUp 1s 0.6s both;">
+        <div class="hero-buttons">
+            <?php if (is_admin()): ?>
+                <!-- Admin Buttons -->
+                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php"
+                    class="btn btn-primary btn-lg">
+                    <i class="fas fa-ticket-alt"></i> Admin Dashboard
+                </a>
+                  <a href="<?php echo SITE_URL; ?>/admin/cancellations.php"
+                    class="btn btn-outline btn-lg">
+                    <i class="fas fa-times-circle"></i> Kelola Pembatalan
+                </a>
+            <?php else: ?>
+                <!-- User Buttons -->
+                <a href="<?php echo SITE_URL; ?>/user/reservation.php"
+                    class="btn btn-primary btn-lg">
+                    <i class="fas fa-ticket-alt"></i> Pesan Sekarang
+                </a>
 
-            <a href="<?php echo SITE_URL; ?>/user/reservation.php"
-                class="btn btn-primary btn-lg"
-                style="padding: 1.25rem 3rem; font-size: 1.2rem; border-radius: 50px;  
-                box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); background: white; color: var(--primary);">
-                <i class="fas fa-ticket-alt"></i> Pesan Tiket Sekarang
-            </a>
-
-            <a href="<?php echo SITE_URL; ?>/user/check-in.php"
-                class="btn btn-outline btn-lg"
-                style="padding: 1.25rem 3rem; font-size: 1.2rem; border-radius: 50px; 
-               background: transparent; color: white; border: 3px solid white;">
-                <i class="fas fa-check-circle"></i> Check-in Online
-            </a>
+                <a href="<?php echo SITE_URL; ?>/user/check-in.php"
+                    class="btn btn-outline btn-lg">
+                    <i class="fas fa-sign-in-alt"></i> Check In
+                </a>
+            <?php endif; ?>
         </div>
 
-        <div style="margin-top: 4rem; animation: fadeInUp 1s 0.8s both;">
-            <p style="color: rgba(255,255,255,0.8); margin-bottom: 1rem;">
-                Dipercaya oleh ribuan penumpang
-            </p>
+        <div class="hero-stats-section">
+            <p class="hero-stats-label">Dipercaya oleh ribuan penumpang</p>
 
-            <div style="display: flex; gap: 3rem; justify-content: center; align-items: center;">
-                <div style="text-align: center;">
-                    <h3 style="color: white; font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        <?php echo $total_services; ?>+
-                    </h3>
-                    <p style="color: rgba(255,255,255,0.9);">Layanan Aktif</p>
+            <div class="hero-stats-grid">
+                <div class="hero-stat-item">
+                    <h3 class="hero-stat-number"><?php echo $total_services; ?>+</h3>
+                    <p class="hero-stat-label">Layanan Aktif</p>
                 </div>
 
-                <div style="text-align: center;">
-                    <h3 style="color: white; font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        <?php echo $total_bookings; ?>+
-                    </h3>
-                    <p style="color: rgba(255,255,255,0.9);">Total Pemesanan</p>
+                <div class="hero-stat-item">
+                    <h3 class="hero-stat-number"><?php echo $total_bookings; ?>+</h3>
+                    <p class="hero-stat-label">Total Pemesanan</p>
                 </div>
 
-                <div style="text-align: center;">
-                    <h3 style="color: white; font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        4.8
-                    </h3>
-                    <p style="color: rgba(255,255,255,0.9);">Rating Pelanggan</p>
+                <div class="hero-stat-item">
+                    <h3 class="hero-stat-number">4.8</h3>
+                    <p class="hero-stat-label">Rating Pelanggan</p>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <!-- SCROLL BUTTON (WORKING) -->
-    <a href="#features"
-        style="position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%);
-              animation: bounce 2s infinite; z-index: 3; cursor: pointer; text-decoration:none;">
-        <i class="fas fa-chevron-down" style="font-size: 2rem; color: white;"></i>
+    <a href="#features" class="scroll-button">
+        <i class="fas fa-chevron-down"></i>
     </a>
 
 </section>
-
-
-<style>
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes fadeInDown {
-        from {
-            opacity: 0;
-            transform: translateY(-30px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes bounce {
-
-        0%,
-        20%,
-        50%,
-        80%,
-        100% {
-            transform: translateX(-50%) translateY(0);
-        }
-
-        40% {
-            transform: translateX(-50%) translateY(-10px);
-        }
-
-        60% {
-            transform: translateX(-50%) translateY(-5px);
-        }
-    }
-
-    html {
-        scroll-behavior: smooth;
-    }
-
-    .btn:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3) !important;
-    }
-
-    .hero-buttons .btn-primary:hover {
-        background: var(--primary) !important;
-        color: white !important;
-    }
-
-    @media (max-width: 768px) {
-        .hero-title {
-            font-size: 2.5rem !important;
-        }
-
-        .hero-subtitle {
-            font-size: 1.1rem !important;
-        }
-
-        .hero-buttons {
-            flex-direction: column;
-        }
-
-        .hero-buttons .btn {
-            width: 100%;
-        }
-    }
-</style>
 
 <!-- Features Section -->
 <section id="features" class="features">
@@ -298,7 +256,7 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
                     <i class="fas fa-city"></i>
                 </div>
                 <h3 class="stat-number">25+</h3>
-                <p>Kota Tujuan</p>
+                <p>Kota Terjangkau</p>
             </div>
         </div>
     </div>
@@ -318,13 +276,14 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
                 class="btn btn-outline">
                 <i class="fas fa-envelope"></i> Email Kami
             </a>
-
-            </a>
         </div>
     </div>
 </section>
 
 <?php
-closeDBConnection($conn);
-include 'includes/footer.php';
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
+include __DIR__ . '/includes/footer.php';
 ?>

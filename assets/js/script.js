@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', function () {
             e.stopPropagation();
             navMenu.classList.toggle('active');
 
+            // Add / remove body locked state
+            if (navMenu.classList.contains('active')) {
+                document.body.classList.add('menu-open');
+            } else {
+                document.body.classList.remove('menu-open');
+            }
+
             // Change icon
             const icon = navToggle.querySelector('i');
             if (navMenu.classList.contains('active')) {
@@ -19,82 +26,91 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Close menu when clicking on a link
-       // Close menu when clicking on a link (except dropdown toggles)
-const navLinks = navMenu.querySelectorAll('a:not(.dropdown-toggle)');
-navLinks.forEach(link => {
-    link.addEventListener('click', function () {
-        // Don't close if clicking dropdown toggle
-        if (this.classList.contains('dropdown-toggle')) return;
-
-        navMenu.classList.remove('active');
-        const icon = navToggle.querySelector('i');
-        if (icon) {
-            icon.classList.remove('fa-times');
-            icon.classList.add('fa-bars');
-        }
-    });
-});
-
-// Handle dropdowns (DESKTOP + MOBILE - FIXED)
-const dropdowns = document.querySelectorAll('.dropdown');
-
-dropdowns.forEach(dropdown => {
-    const toggle = dropdown.querySelector('.dropdown-toggle');
-    const menu = dropdown.querySelector('.dropdown-menu');
-
-    if (!toggle || !menu) return;
-
-    // Toggle dropdown on click
-    toggle.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Close all other dropdowns
-        dropdowns.forEach(d => {
-            if (d !== dropdown) d.classList.remove('active');
+        // Touch support for older devices: trigger the same toggle on touchstart
+        navToggle.addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            this.dispatchEvent(new Event('click'));
         });
 
-        dropdown.classList.toggle('active');
-    });
+        // Close menu when clicking on a link
+        // Close menu when clicking on a link (except dropdown toggles)
+        const navLinks = navMenu.querySelectorAll('a:not(.dropdown-toggle)');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function () {
+                // Don't close if clicking dropdown toggle
+                if (this.classList.contains('dropdown-toggle')) return;
 
-    // Keep dropdown open when hovering the menu
-    menu.addEventListener('mouseenter', () => {
-        dropdown.classList.add('active');
-    });
+                navMenu.classList.remove('active');
+                document.body.classList.remove('menu-open');
 
-    // Add delay before closing
-    dropdown.addEventListener('mouseleave', () => {
-        setTimeout(() => {
-            if (!dropdown.matches(':hover')) {
-                dropdown.classList.remove('active');
+                const icon = navToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-times');
+                    icon.classList.add('fa-bars');
+                }
+            });
+        });
+
+        // Handle dropdowns (DESKTOP + MOBILE - FIXED)
+        const dropdowns = document.querySelectorAll('.dropdown');
+
+        dropdowns.forEach(dropdown => {
+            const toggle = dropdown.querySelector('.dropdown-toggle');
+            const menu = dropdown.querySelector('.dropdown-menu');
+
+            if (!toggle || !menu) return;
+
+            // Toggle dropdown on click
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Close all other dropdowns
+                dropdowns.forEach(d => {
+                    if (d !== dropdown) d.classList.remove('active');
+                });
+
+                dropdown.classList.toggle('active');
+            });
+
+            // Keep dropdown open when hovering the menu
+            menu.addEventListener('mouseenter', () => {
+                dropdown.classList.add('active');
+            });
+
+            // Add delay before closing
+            dropdown.addEventListener('mouseleave', () => {
+                setTimeout(() => {
+                    if (!dropdown.matches(':hover')) {
+                        dropdown.classList.remove('active');
+                    }
+                }, 300);
+            });
+        });
+
+        // Close dropdowns & mobile menu when clicking outside
+        document.addEventListener('click', function (event) {
+            // Close dropdowns if click outside
+            if (!event.target.closest('.dropdown')) {
+                dropdowns.forEach(d => d.classList.remove('active'));
             }
-        }, 300);
-    });
-});
 
-// Close dropdowns & mobile menu when clicking outside
-document.addEventListener('click', function (event) {
-    // Close dropdowns if click outside
-    if (!event.target.closest('.dropdown')) {
-        dropdowns.forEach(d => d.classList.remove('active'));
-    }
+            // Close mobile menu if click outside navbar
+            if (
+                navMenu &&
+                navMenu.classList.contains('active') &&
+                !event.target.closest('.navbar')
+            ) {
+                navMenu.classList.remove('active');
+                document.body.classList.remove('menu-open');
 
-    // Close mobile menu if click outside navbar
-    if (
-        navMenu &&
-        navMenu.classList.contains('active') &&
-        !event.target.closest('.navbar')
-    ) {
-        navMenu.classList.remove('active');
-
-        const icon = navToggle.querySelector('i');
-        if (icon) {
-            icon.classList.remove('fa-times');
-            icon.classList.add('fa-bars');
-        }
-    }
-});
+                const icon = navToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-times');
+                    icon.classList.add('fa-bars');
+                }
+            }
+        });
     }
 });
 

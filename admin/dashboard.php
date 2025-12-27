@@ -1,6 +1,7 @@
 <?php
 $page_title = 'Admin Dashboard';
 require_once '../config/config.php';
+
 require_login();
 require_admin();
 
@@ -48,21 +49,77 @@ include '../includes/header.php';
         margin-bottom: 2rem;
     }
 
-    .monthly-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-        margin-bottom: 2rem;
+    /* Hover styles for action buttons */
+    .btn-kelola-user {
+        background: var(--primary) !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease;
+        display: inline-block;
+        text-align: center;
     }
 
-    .quick-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        margin-top: 1rem;
+    .btn-kelola-user:hover {
+        background: #ffffffff !important;
+        color: var(--primary) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     }
 
-    /* Card improvements */
+    .btn-pembatalan {
+        background: var(--danger) !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease;
+        display: inline-block;
+        text-align: center;
+    }
+       .btn-pembatalan:hover {
+        background: #ebe8e8ff !important;
+        color: var(--danger) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(220, 10, 10, 0.4);
+    }
+
+    .btn-activity-logs {
+        background: #8b5cf6 !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .btn-activity-logs:hover {
+        background: #7c3aed !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+ 
+    .btn-activity-logs {
+        background: #8b5cf6 !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease;
+        display: inline-block;
+        text-align: center;
+    }
+.btn-activity-logs:hover {
+        background: #fdfdfdff !important;
+        color: #2814dfff !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        
+}
     .card {
         border: 1px solid var(--light);
         border-radius: 12px;
@@ -85,7 +142,6 @@ include '../includes/header.php';
         display: flex;
         align-items: center;
         font-weight: 600;
-        
     }
 
     .card-title i {
@@ -94,7 +150,7 @@ include '../includes/header.php';
         font-size: 1.25rem;
     }
 
-    /* Table styling for desktop */
+    /* Desktop Table */
     .table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -122,45 +178,180 @@ include '../includes/header.php';
         background: #f8fafc;
     }
 
-    /* Mobile transaction cards */
+    /* Mobile Transactions */
     .mobile-transactions {
         display: none;
     }
 
-    .transaction-card {
+    .mobile-transaction-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--light);
         background: white;
-        border: 1px solid var(--light);
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: background 0.2s;
     }
 
-    .transaction-card-item {
+    .mobile-transaction-item:hover {
+        background: #f8fafc;
+    }
+
+    .mobile-transaction-item:last-child {
+        border-bottom: none;
+    }
+
+    .transaction-code {
+        flex: 1;
+    }
+
+    .transaction-code strong {
+        color: var(--primary);
+        font-size: 0.95rem;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    .transaction-code small {
+        color: var(--gray);
+        font-size: 0.8rem;
+        display: block;
+    }
+
+    /* Hide status badge in mobile list view */
+    .mobile-transaction-item .badge {
+        display: none;
+    }
+
+    .btn-details {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s;
+    }
+
+    .btn-details:hover {
+        background: #1d4ed8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s;
+    }
+
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s;
+        position: relative;
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--light);
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 1px solid #f1f5f9;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
     }
 
-    .transaction-card-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-
-    .transaction-card-label {
-        font-weight: 600;
-        color: var(--gray);
-        font-size: 0.85rem;
-        min-width: 100px;
-    }
-
-    .transaction-card-value {
-        text-align: right;
+    .modal-header-content {
         flex: 1;
+        padding-right: 1rem;
+    }
+
+    .modal-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .modal-subtitle {
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
+
+    .modal-status {
+        margin-bottom: 0.5rem;
+    }
+
+    .close-modal {
+        background: var(--light);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .close-modal:hover {
+        background: #e5e7eb;
+        transform: rotate(90deg);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--light);
+    }
+
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+
+    .detail-label {
+        color: var(--gray);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .detail-value {
+        color: var(--dark);
+        font-weight: 600;
+        text-align: right;
     }
 
     /* Badge styles */
@@ -168,7 +359,7 @@ include '../includes/header.php';
         display: inline-block;
         padding: 0.35rem 0.85rem;
         border-radius: 20px;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -198,6 +389,28 @@ include '../includes/header.php';
         border: 1px solid #bfdbfe;
     }
 
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
     /* Mobile responsiveness */
     @media (max-width: 768px) {
         .stats-grid {
@@ -205,13 +418,67 @@ include '../includes/header.php';
             gap: 1rem;
         }
 
-        .monthly-grid {
-            grid-template-columns: 1fr;
-            gap: 1rem;
+        /* Change button grid to 3 columns on mobile */
+        div[style*="grid-template-columns: repeat(3, 1fr)"] {
+            grid-template-columns: 1fr !important;
+            gap: 0.75rem !important;
+            max-width: 100% !important;
         }
 
-        .quick-actions {
-            grid-template-columns: 1fr;
+        .btn-kelola-user,
+        .btn-pembatalan,
+        .btn-activity-logs {
+            font-size: 0.9rem !important;
+            padding: 0.65rem 1rem !important;
+        }
+
+        .btn-kelola-user i,
+        .btn-pembatalan i,
+        .btn-activity-logs i {
+            font-size: 0.9rem !important;
+        }
+
+        .card[style*="max-width: 500px"]>div[style*="padding: 1.5rem"]>div[style*="grid-template-columns: 1fr 1fr"] {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            gap: 0.75rem !important;
+        }
+
+        .card[style*="max-width: 500px"] div[style*="text-align: center"][style*="padding: 1.5rem"] {
+            padding: 1rem !important;
+        }
+
+        .card[style*="max-width: 500px"] h3 {
+            font-size: 1.5rem !important;
+        }
+
+        .card[style*="max-width: 500px"] p {
+            font-size: 0.85rem !important;
+        }
+
+        .btn-kelola-user {
+            font-size: 0.9rem !important;
+            padding: 0.65rem 1rem !important;
+        }
+
+        .btn-kelola-user i {
+            font-size: 0.9rem !important;
+        }
+
+        div[style*="border-left: 4px solid var(--primary)"] {
+            display: flex;
+            flex-direction: column;
+        }
+
+        div[style*="border-left: 4px solid var(--primary)"]>div[style*="display: flex"] {
+            flex-direction: column !important;
+            gap: 0.75rem;
+        }
+
+        div[style*="border-left: 4px solid var(--primary)"] .badge {
+            align-self: flex-start;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
         }
 
         .stat-card {
@@ -226,27 +493,28 @@ include '../includes/header.php';
             font-size: 2rem !important;
         }
 
-        /* Show mobile transactions, hide desktop table */
         .desktop-transactions {
-            display: none;
+            display: none !important;
         }
 
         .mobile-transactions {
-            display: block;
+            display: block !important;
+        }
+
+        .mobile-transaction-item {
             padding: 1rem;
         }
 
-        .transaction-card-label {
-            min-width: 80px;
+        .card-header {
+            padding: 1rem;
         }
 
-        .transaction-card-value {
-            text-align: left;
+        .card-title {
+            font-size: 1.1rem !important;
         }
 
-        .badge {
-            padding: 0.3rem 0.7rem;
-            font-size: 0.75rem;
+        .modal-content {
+            margin: 0 1rem;
         }
     }
 
@@ -259,60 +527,90 @@ include '../includes/header.php';
             font-size: 1.5rem !important;
         }
 
-        .card-header {
-            padding: 1rem;
+        .card[style*="max-width: 500px"] h3 {
+            font-size: 1.3rem !important;
         }
 
-        .btn {
-            padding: 0.75rem 1rem !important;
-            font-size: 0.9rem !important;
-            width: 100%;
-            text-align: center;
+        .card[style*="max-width: 500px"] p {
+            font-size: 0.8rem !important;
         }
 
-        .btn i {
-            margin-right: 0.5rem;
+        .btn-kelola-user {
+            font-size: 0.85rem !important;
+            padding: 0.6rem 0.85rem !important;
         }
 
-        .transaction-card {
-            padding: 1rem;
+        .transaction-code strong {
+            font-size: 0.85rem;
         }
 
-        .transaction-card-item {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.25rem;
-        }
-
-        .transaction-card-label {
-            min-width: auto;
+        .btn-details {
+            padding: 0.45rem 0.85rem;
             font-size: 0.8rem;
         }
 
-        .transaction-card-value {
+        .modal-header {
+            padding: 1.25rem;
+        }
+
+        .modal-title {
+            font-size: 1rem;
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+        }
+
+        .detail-item {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .detail-value {
             text-align: left;
-            width: 100%;
-        }
-    }
-
-    /* Additional responsive improvements */
-    @media (max-width: 640px) {
-        .stats-grid {
-            gap: 0.75rem;
-        }
-
-        .stat-card p {
-            font-size: 0.9rem !important;
         }
     }
 
     @media (max-width: 480px) {
         .stat-card h3 {
-            font-size: 2rem !important;
+            font-size: 1.3rem !important;
         }
 
-        .monthly-grid h4 {
-            font-size: 1.1rem;
+        .card[style*="max-width: 500px"] h3 {
+            font-size: 1.1rem !important;
+        }
+
+        .card[style*="max-width: 500px"] p {
+            font-size: 0.75rem !important;
+        }
+
+        .btn-kelola-user {
+            font-size: 0.8rem !important;
+            padding: 0.55rem 0.75rem !important;
+        }
+
+        .btn-kelola-user i {
+            font-size: 0.8rem !important;
+            margin-right: 0.35rem !important;
+        }
+
+        div[style*="border-left: 4px solid var(--primary)"] small {
+            font-size: 0.75rem !important;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .card[style*="max-width: 500px"] h3 {
+            font-size: 1rem !important;
+        }
+
+        .card[style*="max-width: 500px"] p {
+            font-size: 0.7rem !important;
+        }
+
+        .btn-kelola-user {
+            font-size: 0.75rem !important;
+            padding: 0.5rem 0.65rem !important;
         }
     }
 </style>
@@ -321,12 +619,23 @@ include '../includes/header.php';
     <div class="container">
         <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
         <p>Selamat datang, <?php echo $_SESSION['full_name']; ?>!</p>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; max-width: 600px;">
+            <a href="users.php" class="btn btn-primary btn-kelola-user">
+                <i class="fas fa-users"></i> Kelola User
+            </a>
+            <a href="cancellations.php" class="btn btn-pembatalan">
+                <i class="fas fa-ban"></i> Pembatalan
+            </a>
+            <a href="activity_logs.php" class="btn btn-activity-logs";>
+                <i class="fas fa-history"></i> Activity Logs
+            </a>
+        </div>
     </div>
 </section>
 
 <section style="padding: 2rem 0;">
     <div class="container">
-        <!-- Quick Stats -->
         <h3 style="margin-bottom: 1rem;">Statistik Hari Ini</h3>
         <div class="stats-grid">
             <div class="card stat-card" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
@@ -362,70 +671,45 @@ include '../includes/header.php';
             </div>
         </div>
 
-        <!-- Monthly Stats -->
-        <div class="monthly-grid">
-            <div class="card">
+        <div style="display: flex; justify-content: center;">
+            <div class="card monthly-stats-card" style="max-width: 500px; width: 100%;">
                 <div class="card-header">
                     <h4 class="card-title"><i class="fas fa-chart-line"></i> Bulan Ini</h4>
                 </div>
-                <div style="padding: 1.5rem;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div style="text-align: center; padding: 1.5rem; background: var(--light); border-radius: 12px;">
-                            <h3 style="color: var(--primary); margin: 0 0 0.5rem 0; font-size: 2rem;"><?php echo $month_bookings; ?></h3>
-                            <p style="color: var(--gray); margin: 0;">Pemesanan</p>
+                <div class="monthly-stats-container" style="padding: 1.5rem;">
+                    <div class="monthly-stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="monthly-stat-box" style="text-align: center; padding: 1.5rem; background: var(--light); border-radius: 12px;">
+                            <h3 class="monthly-stat-number" style="color: var(--primary); margin: 0 0 0.5rem 0; font-size: 2rem;"><?php echo $month_bookings; ?></h3>
+                            <p class="monthly-stat-label" style="color: var(--gray); margin: 0;">Pemesanan</p>
                         </div>
-                        <div style="text-align: center; padding: 1.5rem; background: var(--light); border-radius: 12px;">
-                            <h3 style="color: var(--secondary); margin: 0 0 0.5rem 0; font-size: 1.5rem;"><?php echo format_currency($month_revenue); ?></h3>
-                            <p style="color: var(--gray); margin: 0;">Pendapatan</p>
+                        <div class="monthly-stat-box" style="text-align: center; padding: 1.5rem; background: var(--light); border-radius: 12px;">
+                            <h3 class="monthly-stat-number" style="color: var(--secondary); margin: 0 0 0.5rem 0; font-size: 1.5rem;"><?php echo format_currency($month_revenue); ?></h3>
+                            <p class="monthly-stat-label" style="color: var(--gray); margin: 0;">Pendapatan</p>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title"><i class="fas fa-tools"></i> Aksi Cepat</h4>
-                </div>
-                <div style="padding: 1.5rem;">
-                    <div class="quick-actions">
-                        <a href="users.php" class="btn btn-primary">
-                            <i class="fas fa-users"></i> Kelola User
-                        </a>
-                        <a href="services.php" class="btn btn-secondary">
-                            <i class="fas fa-bus"></i> Kelola Layanan
-                        </a>
-                        <a href="cancellations.php" class="btn" style="background: var(--accent); color: white;">
-                            <i class="fas fa-ban"></i> Pembatalan
-                        </a>
-                        <a href="blog-management.php" class="btn" style="background: var(--danger); color: white;">
-                            <i class="fas fa-blog"></i> Kelola Blog
-                        </a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Recent Transactions (Desktop Table) -->
+        <!-- Desktop Table -->
         <div class="card desktop-transactions">
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-exchange-alt"></i> Transaksi Terbaru</h3>
             </div>
             <div class="table-container" style="padding: 1.5rem;">
-                <table class="table" style="min-width: 800px; color: black;" >
+                <table class="table" style="min-width: 800px; color: black;">
                     <thead>
                         <tr>
-                            <th style="color: black; text-align: left;">Kode</th>
-                            <th style="color: black; text-align: left;">Customer</th>
-                            <th style="color: black; text-align: left;">Layanan</th>
-                            <th style="color: black; text-align: left;">Tanggal</th>
-                            <th style="color: black; text-align: left;">Total</th>
-                            <th style="color: black; text-align: left;">Status</th>
+                            <th style="color: black;">Kode</th>
+                            <th style="color: black;">Customer</th>
+                            <th style="color: black;">Layanan</th>
+                            <th style="color: black;">Tanggal</th>
+                            <th style="color: black;">Total</th>
+                            <th style="color: black;">Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                        $recent_transactions->data_seek(0); // Reset pointer
-                        while ($trans = $recent_transactions->fetch_assoc()): ?>
+                        <?php while ($trans = $recent_transactions->fetch_assoc()): ?>
                             <tr>
                                 <td><strong><?php echo $trans['booking_code']; ?></strong></td>
                                 <td><?php echo $trans['full_name']; ?></td>
@@ -448,52 +732,36 @@ include '../includes/header.php';
             </div>
         </div>
 
-        <!-- Recent Transactions (Mobile Cards) -->
+        <!-- Mobile Transactions -->
         <div class="card mobile-transactions">
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-exchange-alt"></i> Transaksi Terbaru</h3>
             </div>
-            <div class="mobile-transactions">
+            <div>
                 <?php
-                $recent_transactions->data_seek(0); // Reset pointer
-                while ($trans = $recent_transactions->fetch_assoc()): ?>
-                    <div class="transaction-card">
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Kode Booking:</div>
-                            <div class="transaction-card-value">
-                                <strong style="color: var(--primary);"><?php echo $trans['booking_code']; ?></strong>
-                            </div>
+                $recent_transactions->data_seek(0);
+                while ($trans = $recent_transactions->fetch_assoc()):
+                    $status_class = 'success';
+                    if ($trans['booking_status'] === 'pending') $status_class = 'warning';
+                    elseif ($trans['booking_status'] === 'cancelled') $status_class = 'danger';
+                ?>
+                    <div class="mobile-transaction-item">
+                        <div class="transaction-code">
+                            <strong><?php echo $trans['booking_code']; ?></strong>
+                            <small><?php echo format_date($trans['travel_date']); ?></small>
                         </div>
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Customer:</div>
-                            <div class="transaction-card-value"><?php echo $trans['full_name']; ?></div>
-                        </div>
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Layanan:</div>
-                            <div class="transaction-card-value"><?php echo $trans['service_name']; ?></div>
-                        </div>
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Tanggal:</div>
-                            <div class="transaction-card-value"><?php echo format_date($trans['travel_date']); ?></div>
-                        </div>
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Total:</div>
-                            <div class="transaction-card-value">
-                                <strong style="color: var(--secondary);"><?php echo format_currency($trans['total_price']); ?></strong>
-                            </div>
-                        </div>
-                        <div class="transaction-card-item">
-                            <div class="transaction-card-label">Status:</div>
-                            <div class="transaction-card-value">
-                                <span class="badge badge-<?php
-                                                            if ($trans['booking_status'] === 'confirmed') echo 'success';
-                                                            elseif ($trans['booking_status'] === 'pending') echo 'warning';
-                                                            else echo 'danger';
-                                                            ?>">
-                                    <?php echo ucfirst($trans['booking_status']); ?>
-                                </span>
-                            </div>
-                        </div>
+                        <button class="btn-details" onclick='openModal(<?php echo json_encode([
+                                                                            "code" => $trans['booking_code'],
+                                                                            "customer" => $trans['full_name'],
+                                                                            "service" => $trans['service_name'],
+                                                                            "date" => format_date($trans['travel_date']),
+                                                                            "total" => format_currency($trans['total_price']),
+                                                                            "status" => ucfirst($trans['booking_status']),
+                                                                            "statusClass" => $status_class
+                                                                        ]); ?>)'>
+                            <span>Detail</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
                     </div>
                 <?php endwhile; ?>
             </div>
@@ -538,43 +806,99 @@ include '../includes/header.php';
     </div>
 </section>
 
+<!-- Modal -->
+<div id="transactionModal" class="modal" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-header-content">
+                <div class="modal-title" id="modalCode"></div>
+                <div class="modal-subtitle" id="modalDate"></div>
+                <div class="modal-status">
+                    <span class="badge" id="modalStatus"></span>
+                </div>
+            </div>
+            <button class="close-modal" onclick="closeModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-item">
+                <span class="detail-label">Customer</span>
+                <span class="detail-value" id="modalCustomer"></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Layanan</span>
+                <span class="detail-value" id="modalService"></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Tanggal Travel</span>
+                <span class="detail-value" id="modalTravelDate"></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Total Harga</span>
+                <span class="detail-value" id="modalTotal" style="color: var(--secondary); font-size: 1.1rem;"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Function to handle responsive switching
-        function handleResponsiveDisplay() {
-            const desktopTable = document.querySelector('.desktop-transactions');
-            const mobileCards = document.querySelector('.mobile-transactions');
+    // Modal functionality
+    function openModal(data) {
+        const modal = document.getElementById('transactionModal');
+        const statusBadge = document.getElementById('modalStatus');
 
-            if (window.innerWidth <= 768) {
-                // Mobile view - hide desktop table
-                if (desktopTable) {
-                    desktopTable.style.display = 'none';
-                }
-                // Show mobile cards (already shown via CSS but ensure it's visible)
-                if (mobileCards) {
-                    mobileCards.style.display = 'block';
-                }
-            } else {
-                // Desktop view - show table
-                if (desktopTable) {
-                    desktopTable.style.display = 'block';
-                }
-                // Hide mobile cards (already hidden via CSS but ensure it's hidden)
-                if (mobileCards) {
-                    mobileCards.style.display = 'none';
-                }
-            }
+        // Set modal content
+        document.getElementById('modalCode').textContent = data.code;
+        document.getElementById('modalDate').textContent = data.date;
+        document.getElementById('modalCustomer').textContent = data.customer;
+        document.getElementById('modalService').textContent = data.service;
+        document.getElementById('modalTravelDate').textContent = data.date;
+        document.getElementById('modalTotal').textContent = data.total;
+
+        // Set status badge
+        statusBadge.textContent = data.status;
+        statusBadge.className = 'badge badge-' + data.statusClass;
+
+        // Show modal
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('transactionModal');
+        modal.classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    function closeModalOnBackdrop(event) {
+        if (event.target.id === 'transactionModal') {
+            closeModal();
         }
+    }
 
-        // Check on load
-        handleResponsiveDisplay();
+    // Close modal on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    });
 
-        // Check on resize
-        window.addEventListener('resize', handleResponsiveDisplay);
+    // Prevent button click from bubbling to parent
+    document.addEventListener('DOMContentLoaded', function() {
+        const detailButtons = document.querySelectorAll('.btn-details');
+        detailButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
     });
 </script>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

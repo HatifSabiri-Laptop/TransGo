@@ -1,22 +1,23 @@
 <?php
-// Start session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// App configuration
-define('SITE_NAME', 'TransGo - Transportation Booking');
-define('SITE_URL', 'http://localhost:8000'); // Change port if needed (8000, 80, or remove :8000 if using XAMPP default)
-define('ADMIN_EMAIL', 'admin@transport.com');
+require_once __DIR__ . '/database.php';
 
+define('SITE_NAME', 'TransGo');
+define('SITE_URL', 'http://localhost:8000');
+define('ADMIN_EMAIL', 'admin@transport.com');
 // Timezone
 date_default_timezone_set('Asia/Jakarta');
 
-// Include database
-require_once __DIR__ . '/database.php';
+// Enable error logging (for debugging - remove in production)
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log');
 
 // Security: Prevent XSS
-function clean_input($data) {
+function clean_input($data)
+{
     $data = trim($data);
     $data = stripslashes($data);
     $data = htmlspecialchars($data);
@@ -24,22 +25,26 @@ function clean_input($data) {
 }
 
 // Check if user is logged in
-function is_logged_in() {
+function is_logged_in()
+{
     return isset($_SESSION['user_id']);
 }
 
 // Check if user is admin
-function is_admin() {
+function is_admin()
+{
     return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 }
 
 // Check if user is staff or admin
-function is_staff() {
+function is_staff()
+{
     return isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'staff']);
 }
 
 // Redirect if not logged in
-function require_login() {
+function require_login()
+{
     if (!is_logged_in()) {
         header('Location: ' . SITE_URL . '/auth/login.php');
         exit();
@@ -47,26 +52,33 @@ function require_login() {
 }
 
 // Redirect if not admin
-function require_admin() {
-    if (!is_admin()) {
-        header('Location: ' . SITE_URL . '/index.php');
+function require_admin()
+{
+    if (
+        !isset($_SESSION['user_id']) ||
+        !isset($_SESSION['role']) ||
+        $_SESSION['role'] !== 'admin'
+    ) {
+        header("Location: " . SITE_URL . "/auth/login.php");
         exit();
     }
 }
 
 // Generate booking code
-function generate_booking_code() {
+function generate_booking_code()
+{
     return 'TRN' . date('Ymd') . rand(1000, 9999);
 }
 
 // Format currency
-function format_currency($amount) {
+function format_currency($amount)
+{
     return 'Rp ' . number_format($amount, 0, ',', '.');
 }
 
 // Format datetime
-// In config/config.php
-function format_datetime($datetime, $format = 'd M Y H:i') {
+function format_datetime($datetime, $format = 'd M Y H:i')
+{
     if (empty($datetime) || $datetime === '0000-00-00 00:00:00') {
         return '-';
     }
@@ -77,7 +89,8 @@ function format_datetime($datetime, $format = 'd M Y H:i') {
     return date($format, $timestamp);
 }
 
-function format_date($date, $format = 'd M Y') {
+function format_date($date, $format = 'd M Y')
+{
     if (empty($date) || $date === '0000-00-00') {
         return '-';
     }
@@ -88,27 +101,101 @@ function format_date($date, $format = 'd M Y') {
     return date($format, $timestamp);
 }
 
-// Log activity
-function log_activity($conn, $user_id, $action, $description = '') {
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("isss", $user_id, $action, $description, $ip);
-    $stmt->execute();
-    $stmt->close();
+// ✅ FIXED: Log activity using ActivityLogger class
+function log_activity($conn, $userId, $action, $description, $metadata = null) {
+    try {
+        // Ensure ActivityLogger class is loaded
+        if (!class_exists('ActivityLogger')) {
+            require_once __DIR__ . '/activity_logger.php';
+        }
+        
+        // Validate connection
+        if (!$conn || !($conn instanceof mysqli)) {
+            error_log("log_activity: Invalid database connection");
+            return false;
+        }
+        
+        // Check connection is alive
+        if (!$conn->ping()) {
+            error_log("log_activity: Database connection is dead");
+            return false;
+        }
+        
+        // Create logger instance
+        $logger = new ActivityLogger($conn);
+        
+        // Log the activity
+        $result = $logger->log($userId, $action, $description, null, $metadata);
+        
+        // Debug logging (comment out in production)
+        if (!$result) {
+            error_log("log_activity FAILED: User=$userId, Action=$action, Desc=$description");
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("log_activity EXCEPTION: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        return false;
+    }
+}
+
+// ✅ FIXED: Check if current user has been deleted
+function check_user_deleted() {
+    if (isset($_SESSION['user_id'])) {
+        $conn = getDBConnection();
+        $user_id = $_SESSION['user_id'];
+        
+        $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            // User has been deleted
+            $stmt->close();
+            $conn->close();
+            
+            // Clear session
+            session_unset();
+            session_destroy();
+            
+            // Set a flag to show alert on login page
+            session_start();
+            $_SESSION['user_deleted_alert'] = true;
+            
+            // Redirect without JavaScript
+            header('Location: ' . SITE_URL . '/auth/login.php');
+            exit();
+        }
+        
+        $stmt->close();
+        $conn->close();
+    }
+}
+
+// Call this function on every page load (but not in login.php to avoid loop)
+if (!isset($_GET['page']) || $_GET['page'] !== 'login') {
+    $current_file = basename($_SERVER['PHP_SELF']);
+    if ($current_file !== 'login.php' && $current_file !== 'register.php' && $current_file !== 'test_log.php') {
+        check_user_deleted();
+    }
 }
 
 // Email configuration
-define('SMTP_HOST', 'smtp.gmail.com'); // Change to your SMTP host
+define('SMTP_HOST', 'smtp.gmail.com');
 define('SMTP_PORT', 587);
-define('SMTP_USERNAME', 'your-email@gmail.com'); // Change this
-define('SMTP_PASSWORD', 'your-app-password'); // Use app password for Gmail
+define('SMTP_USERNAME', 'your-email@gmail.com');
+define('SMTP_PASSWORD', 'your-app-password');
 define('FROM_EMAIL', 'noreply@transgo.com');
 define('FROM_NAME', 'TransGo Transportation');
 
 // Send welcome email
-function send_welcome_email($to_email, $full_name) {
+function send_welcome_email($to_email, $full_name)
+{
     $subject = "Selamat Datang di TransGo!";
-    
+
     $message = "
     <html>
     <head>
@@ -156,18 +243,19 @@ function send_welcome_email($to_email, $full_name) {
     </body>
     </html>
     ";
-    
+
     $headers = "MIME-Version: 1.0" . "\r\n";
     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
     $headers .= "From: " . FROM_NAME . " <" . FROM_EMAIL . ">" . "\r\n";
-    
+
     return mail($to_email, $subject, $message, $headers);
 }
 
 // Send booking confirmation email
-function send_booking_confirmation_email($to_email, $full_name, $booking_data) {
+function send_booking_confirmation_email($to_email, $full_name, $booking_data)
+{
     $subject = "Konfirmasi Booking - " . $booking_data['booking_code'];
-    
+
     $message = "
     <html>
     <head>
@@ -246,18 +334,19 @@ function send_booking_confirmation_email($to_email, $full_name, $booking_data) {
     </body>
     </html>
     ";
-    
+
     $headers = "MIME-Version: 1.0" . "\r\n";
     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
     $headers .= "From: " . FROM_NAME . " <" . FROM_EMAIL . ">" . "\r\n";
-    
+
     return mail($to_email, $subject, $message, $headers);
 }
 
 // Send check-in confirmation email
-function send_checkin_confirmation_email($to_email, $full_name, $booking_code) {
+function send_checkin_confirmation_email($to_email, $full_name, $booking_code)
+{
     $subject = "Check-in Berhasil - " . $booking_code;
-    
+
     $message = "
     <html>
     <head>
@@ -302,11 +391,10 @@ function send_checkin_confirmation_email($to_email, $full_name, $booking_code) {
     </body>
     </html>
     ";
-    
+
     $headers = "MIME-Version: 1.0" . "\r\n";
     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
     $headers .= "From: " . FROM_NAME . " <" . FROM_EMAIL . ">" . "\r\n";
-    
+
     return mail($to_email, $subject, $message, $headers);
 }
-?>

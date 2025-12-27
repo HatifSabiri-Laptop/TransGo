@@ -2,9 +2,127 @@
 $page_title = 'Pengalaman Anda';
 require_once '../config/config.php';
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $conn = getDBConnection();
 
-// Get all approved experiences with user info, admin replies, and media
+// Check for SQL errors first
+if (!$conn) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
+
+// Helper functions that might be missing
+if (!function_exists('is_admin')) {
+    function is_admin() {
+        return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
+    }
+}
+
+if (!function_exists('clean_input')) {
+    function clean_input($data) {
+        $data = trim($data);
+        $data = stripslashes($data);
+        $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+        return $data;
+    }
+}
+
+if (!function_exists('format_datetime')) {
+    function format_datetime($datetime) {
+        if (empty($datetime)) return '';
+        return date('d M Y H:i', strtotime($datetime));
+    }
+}
+
+if (!function_exists('is_logged_in')) {
+    function is_logged_in() {
+        return isset($_SESSION['user_id']);
+    }
+}
+
+if (!function_exists('log_activity')) {
+    function log_activity($conn, $user_id, $action, $description) {
+        // Simple logging - you can modify this based on your actual logging system
+        $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, ?, ?, ?)");
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $stmt->bind_param("isss", $user_id, $action, $description, $ip);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Handle admin reply submission FIRST, before any output
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reply'])) {
+    if (!is_admin()) {
+        die("Unauthorized access");
+    }
+    
+    $experience_id = intval($_POST['experience_id']);
+    $admin_reply = clean_input($_POST['admin_reply']);
+    $admin_id = $_SESSION['user_id'];
+    
+    if (!empty($admin_reply) && $experience_id > 0) {
+        $stmt = $conn->prepare("UPDATE experiences SET admin_reply = ?, admin_reply_at = NOW(), replied_by = ? WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("sii", $admin_reply, $admin_id, $experience_id);
+            
+            if ($stmt->execute()) {
+                log_activity($conn, $admin_id, 'reply_experience', "Admin replied to experience ID: $experience_id");
+                header("Location: " . $_SERVER['PHP_SELF'] . "?replied=1");
+                exit();
+            } else {
+                echo "Error executing statement: " . $stmt->error;
+                $stmt->close();
+                exit();
+            }
+        } else {
+            echo "Error preparing statement: " . $conn->error;
+            exit();
+        }
+    }
+}
+
+// Handle delete
+if (isset($_GET['delete'])) {
+    if (!is_admin()) {
+        die("Unauthorized access");
+    }
+    
+    $exp_id = (int)$_GET['delete'];
+    
+    if ($exp_id > 0) {
+        // Check if experience exists first
+        $check = $conn->query("SELECT id FROM experiences WHERE id = $exp_id");
+        if ($check->num_rows > 0) {
+            // Delete media files
+            $media = $conn->query("SELECT file_path FROM experience_media WHERE experience_id = $exp_id");
+            if ($media) {
+                while ($m = $media->fetch_assoc()) {
+                    $file = '../' . $m['file_path'];
+                    if (file_exists($file)) {
+                        unlink($file);
+                    }
+                }
+            }
+            
+            // Delete from database
+            if ($conn->query("DELETE FROM experiences WHERE id = $exp_id")) {
+                log_activity($conn, $_SESSION['user_id'], 'delete_experience', "Deleted experience ID: $exp_id");
+                header("Location: " . $_SERVER['PHP_SELF'] . "?deleted=1");
+                exit();
+            }
+        }
+    }
+}
+
+// Now get all approved experiences with user info, admin replies, and media
 $experiences_query = "SELECT e.*, u.full_name, u.email,
     admin.full_name as admin_name,
     (SELECT COUNT(*) FROM experience_media WHERE experience_id = e.id AND media_type = 'photo') as photo_count,
@@ -16,64 +134,37 @@ $experiences_query = "SELECT e.*, u.full_name, u.email,
     ORDER BY e.created_at DESC";
 
 $experiences = $conn->query($experiences_query);
+if (!$experiences) {
+    echo "Error in experiences query: " . $conn->error;
+    exit();
+}
 
 // Calculate average rating
 $avg_rating_result = $conn->query("SELECT AVG(rating) as avg_rating, COUNT(*) as total_reviews FROM experiences WHERE status = 'approved'");
+if (!$avg_rating_result) {
+    echo "Error in rating query: " . $conn->error;
+    exit();
+}
 $rating_stats = $avg_rating_result->fetch_assoc();
 $avg_rating = $rating_stats['avg_rating'] ? round($rating_stats['avg_rating'], 1) : 0;
-$total_reviews = $rating_stats['total_reviews'];
+$total_reviews = $rating_stats['total_reviews'] ?? 0;
 
 // Get rating distribution
 $rating_dist = $conn->query("SELECT rating, COUNT(*) as count FROM experiences WHERE status = 'approved' GROUP BY rating ORDER BY rating DESC");
+if (!$rating_dist) {
+    echo "Error in distribution query: " . $conn->error;
+    exit();
+}
 $distribution = array_fill(1, 5, 0);
 while ($row = $rating_dist->fetch_assoc()) {
     $distribution[$row['rating']] = $row['count'];
-}
-
-// Handle admin reply submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reply']) && is_admin()) {
-    $experience_id = intval($_POST['experience_id']);
-    $admin_reply = clean_input($_POST['admin_reply']);
-    $admin_id = $_SESSION['user_id'];
-    
-    if (!empty($admin_reply)) {
-        $stmt = $conn->prepare("UPDATE experiences SET admin_reply = ?, admin_reply_at = NOW(), replied_by = ? WHERE id = ?");
-        $stmt->bind_param("sii", $admin_reply, $admin_id, $experience_id);
-        
-        if ($stmt->execute()) {
-            log_activity($conn, $admin_id, 'reply_experience', "Admin replied to experience ID: $experience_id");
-            header("Location: " . $_SERVER['PHP_SELF'] . "?replied=1");
-            exit();
-        }
-        $stmt->close();
-    }
-}
-
-// Handle delete
-if (isset($_GET['delete']) && is_admin()) {
-    $exp_id = (int)$_GET['delete'];
-    
-    // Delete media files
-    $media = $conn->query("SELECT file_path FROM experience_media WHERE experience_id = $exp_id");
-    while ($m = $media->fetch_assoc()) {
-        $file = '../' . $m['file_path'];
-        if (file_exists($file)) {
-            unlink($file);
-        }
-    }
-    
-    // Delete from database
-    $conn->query("DELETE FROM experiences WHERE id = $exp_id");
-    log_activity($conn, $_SESSION['user_id'], 'delete_experience', "Deleted experience ID: $exp_id");
-    
-    header("Location: " . $_SERVER['PHP_SELF'] . "?deleted=1");
-    exit();
 }
 
 include '../includes/header.php';
 ?>
 
 <style>
+/* Your CSS styles remain the same */
 .tab-navigation {
     background: white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -377,7 +468,7 @@ include '../includes/header.php';
                             <?php echo nl2br(htmlspecialchars($exp['comment'])); ?>
                         </p>
                         
-                        <?php if ($media->num_rows > 0): ?>
+                        <?php if ($media && $media->num_rows > 0): ?>
                         <div class="experience-media">
                             <?php while ($m = $media->fetch_assoc()): ?>
                                 <div class="media-item" onclick="viewMedia('<?php echo SITE_URL . '/' . $m['file_path']; ?>', '<?php echo $m['media_type']; ?>')">
@@ -524,6 +615,9 @@ document.getElementById('mediaModal').addEventListener('click', function(e) {
 </script>
 
 <?php
-closeDBConnection($conn);
+if ($conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

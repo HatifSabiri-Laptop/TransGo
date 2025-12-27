@@ -43,6 +43,31 @@ include '../includes/header.php';
 ?>
 
 <style>
+  .cta-btn {
+    background: var(--primary);
+    color: white;
+    width: 100%;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+  .cta-btn:hover {
+    background: white;
+    color: var(--primary);
+    transform: translateY(-2px);
+  }
+.btn.cta-btn.btn-primary {
+    background-color: var(--primary);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn.cta-btn.btn-primary:hover {
+    background-color: #ffffffff;
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+
     .article-content {
         line-height: 1.8;
         font-size: 1.1rem;
@@ -303,32 +328,46 @@ include '../includes/header.php';
                     <?php endif; ?>
 
                     <div style="padding: 1rem; text-align: center; border-top: 1px solid var(--light);">
-                        <a href="<?php echo SITE_URL; ?>/blog/index.php" class="btn btn-primary" style="width: 100%;">
+                        <a href="<?php echo SITE_URL; ?>/blog/index.php" class="btn cta-btn btn-primary" style="width: 100%;">
                             <i class="fas fa-list"></i> Lihat Semua Artikel
                         </a>
                     </div>
                 </div>
-
                 <!-- CTA Card -->
-                <div class="card" style="margin-top: 1.5rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white;">
-                    <h4 style="color: white; margin-bottom: 1rem;">
-                        <i class="fas fa-bus"></i> Pesan Tiket Sekarang
-                    </h4>
-                    <p style="margin-bottom: 1.5rem; opacity: 0.9;">
-                        Dapatkan pengalaman perjalanan terbaik dengan layanan kami
-                    </p>
-                    <a href="<?php echo SITE_URL; ?>/user/reservation.php"
-                        class="btn"
-                        style="background: white; color: var(--primary); width: 100%; font-weight: 600;">
-                        Pesan Tiket <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
+                <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+                    <div class="card" style="margin-top: 1.5rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white;">
+                        <h4 style="color: white; margin-bottom: 1rem;">
+                            <i class="fas fa-tools"></i> Admin Dashboard
+                        </h4>
+                        <p style="margin-bottom: 1.5rem; opacity: 0.9;">
+                            Kelola sistem dan pantau aktivitas pengguna di sini.
+                        </p>
+                        <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn cta-btn">
+                            Admin Dashboard <i class="fas fa-arrow-right"></i>
+                        </a>
+
+                    <?php else: ?>
+                        <div class="card" style="margin-top: 1.5rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white;">
+                            <h4 style="color: white; margin-bottom: 1rem;">
+                                <i class="fas fa-bus"></i> Pesan Tiket Sekarang
+                            </h4>
+                            <p style="margin-bottom: 1.5rem; opacity: 0.9;">
+                                Dapatkan pengalaman perjalanan terbaik dengan layanan kami
+                            </p>
+                            <a href="<?php echo SITE_URL; ?>/user/reservation.php"
+                                class="btn cta-btn btn-primary">
+                                Pesan Tiket <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                    </div>
             </div>
         </div>
-    </div>
 </section>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 include '../includes/footer.php';
 ?>

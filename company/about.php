@@ -41,4 +41,7 @@ AOS.init({ duration: 800, once: true });
 </script>
 
 <?php
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 include __DIR__ . '/../includes/footer.php';

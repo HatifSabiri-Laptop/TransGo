@@ -3,12 +3,6 @@
 -- COMPLETE FIXED SCHEMA - IMPORT THIS FILE
 -- ============================================
 
--- Drop database if exists (fresh start)
-DROP DATABASE IF EXISTS transportation_app;
-
--- Create database
-CREATE DATABASE transportation_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE transportation_app;
 
 -- ============================================
 -- Table: users (MUST BE FIRST - referenced by others)
@@ -161,6 +155,43 @@ CREATE TABLE activity_logs (
 -- Insert initial activity log
 INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES
 (1, 'system_setup', 'Database initialized with sample data', '127.0.0.1');
+
+-- ============================================
+-- Table: service_ratings
+-- ============================================
+CREATE TABLE service_ratings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    service_id INT NOT NULL,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    image_path VARCHAR(255),
+    video_path VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+    INDEX idx_service_id (service_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_rating (rating),
+    UNIQUE KEY unique_rating (user_id, service_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- Table: rating_replies
+-- ============================================
+CREATE TABLE rating_replies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rating_id INT NOT NULL,
+    user_id INT NOT NULL,
+    reply_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (rating_id) REFERENCES service_ratings(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_rating_id (rating_id),
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
 -- Verify Installation

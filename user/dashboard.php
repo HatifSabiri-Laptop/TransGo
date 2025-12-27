@@ -6,25 +6,52 @@ require_login();
 $conn = getDBConnection();
 $user_id = $_SESSION['user_id'];
 
-// Get user statistics
-$total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id")->fetch_assoc()['count'];
-$active_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id AND booking_status = 'confirmed' AND travel_date >= CURDATE()")->fetch_assoc()['count'];
-$cancelled_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id AND booking_status = 'cancelled'")->fetch_assoc()['count'];
+// Check if user is admin
+$is_admin_user = is_admin();
 
-// Get recent bookings
-$recent_bookings = $conn->query("SELECT r.*, s.service_name, s.route 
-    FROM reservations r 
-    JOIN services s ON r.service_id = s.id 
-    WHERE r.user_id = $user_id 
-    ORDER BY r.created_at DESC 
-    LIMIT 5");
-
-// Get pending cancellation requests
-$pending_cancellations = $conn->query("SELECT cr.*, r.booking_code 
-    FROM cancellation_requests cr 
-    JOIN reservations r ON cr.reservation_id = r.id 
-    WHERE cr.user_id = $user_id AND cr.status = 'pending' 
-    ORDER BY cr.created_at DESC");
+if ($is_admin_user) {
+    // ADMIN STATISTICS
+    // 1. Total tickets issued (all paid reservations)
+    $total_tickets = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE payment_status = 'paid'")->fetch_assoc()['count'];
+    
+    // 2. Revenue this month (total of all paid bookings this month)
+    $current_month = date('Y-m');
+    $revenue_this_month = $conn->query("SELECT COALESCE(SUM(total_price), 0) as revenue FROM reservations WHERE payment_status = 'paid' AND DATE_FORMAT(created_at, '%Y-%m') = '$current_month'")->fetch_assoc()['revenue'];
+    
+    // 3. Net profit (revenue minus refunds this month)
+    $refunds_this_month = $conn->query("SELECT COALESCE(SUM(r.total_price), 0) as refunds FROM reservations r JOIN cancellation_requests cr ON r.id = cr.reservation_id WHERE cr.status = 'approved' AND DATE_FORMAT(cr.processed_at, '%Y-%m') = '$current_month'")->fetch_assoc()['refunds'];
+    $net_profit = $revenue_this_month - $refunds_this_month;
+    
+    // 4. New users this month
+    $new_users_month = $conn->query("SELECT COUNT(*) as count FROM users WHERE DATE_FORMAT(created_at, '%Y-%m') = '$current_month'")->fetch_assoc()['count'];
+    
+    // 5. Routes with zero bookings
+    $zero_booking_routes = $conn->query("SELECT s.id, s.service_name, s.route FROM services s LEFT JOIN reservations r ON s.id = r.service_id WHERE s.status = 'active' AND r.id IS NULL ORDER BY s.service_name");
+    
+    // 6. Refund reports (approved cancellations this month)
+    $refund_reports = $conn->query("SELECT cr.*, r.booking_code, r.total_price, s.service_name, s.route, u.full_name FROM cancellation_requests cr JOIN reservations r ON cr.reservation_id = r.id JOIN services s ON r.service_id = s.id JOIN users u ON cr.user_id = u.id WHERE cr.status = 'approved' AND DATE_FORMAT(cr.processed_at, '%Y-%m') = '$current_month' ORDER BY cr.processed_at DESC LIMIT 10");
+    
+} else {
+    // USER STATISTICS
+    $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id")->fetch_assoc()['count'];
+    $active_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id AND booking_status = 'confirmed' AND travel_date >= CURDATE()")->fetch_assoc()['count'];
+    $cancelled_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations WHERE user_id = $user_id AND booking_status = 'cancelled'")->fetch_assoc()['count'];
+    
+    // Get recent bookings
+    $recent_bookings = $conn->query("SELECT r.*, s.service_name, s.route 
+        FROM reservations r 
+        JOIN services s ON r.service_id = s.id 
+        WHERE r.user_id = $user_id 
+        ORDER BY r.created_at DESC 
+        LIMIT 5");
+    
+    // Get pending cancellation requests
+    $pending_cancellations = $conn->query("SELECT cr.*, r.booking_code 
+        FROM cancellation_requests cr 
+        JOIN reservations r ON cr.reservation_id = r.id 
+        WHERE cr.user_id = $user_id AND cr.status = 'pending' 
+        ORDER BY cr.created_at DESC");
+}
 
 include '../includes/header.php';
 ?>
@@ -146,6 +173,249 @@ include '../includes/header.php';
         color: var(--dark);
     }
 
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s;
+    }
+
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s;
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--light);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .close-modal {
+        background: var(--light);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .close-modal:hover {
+        background: #e5e7eb;
+        transform: rotate(90deg);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--light);
+    }
+
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+
+    .detail-label {
+        color: var(--gray);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .detail-value {
+        color: var(--dark);
+        font-weight: 600;
+        text-align: right;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* Mobile-only column */
+    .mobile-only {
+        display: none;
+    }
+
+    .desktop-only {
+        display: table-cell;
+    }
+
+    /* Refund Modal Styles */
+    .refund-modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s;
+    }
+
+    .refund-modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .refund-modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .refund-modal-header {
+        background: linear-gradient(135deg, #dc2626, #991b1b);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 16px 16px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .refund-modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .refund-modal-body {
+        padding: 1.5rem;
+    }
+
+    .refund-detail-item {
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        background: var(--light);
+        border-radius: 8px;
+        border-left: 4px solid var(--primary);
+    }
+
+    .refund-detail-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .refund-detail-label {
+        font-size: 0.85rem;
+        color: var(--gray);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .refund-detail-value {
+        color: var(--dark);
+        font-weight: 600;
+        font-size: 1rem;
+        word-wrap: break-word;
+    }
+
+    .refund-amount-highlight {
+        background: #fee2e2;
+        border-left-color: #dc2626 !important;
+    }
+
+    .refund-amount-highlight .refund-detail-value {
+        color: #dc2626;
+        font-size: 1.3rem;
+        font-weight: 700;
+    }
+
+    .refund-reason-box {
+        background: #fef3c7;
+        border-left-color: #f59e0b !important;
+        padding: 1rem;
+    }
+
+    .refund-reason-box .refund-detail-value {
+        font-weight: 400;
+        line-height: 1.6;
+        color: #78350f;
+    }
+
+    /* Alert/Warning Box for Zero Bookings */
+    .alert-warning-box {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .alert-warning-box strong {
+        color: #92400e;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .alert-warning-box ul {
+        margin: 0.5rem 0 0 1.5rem;
+        color: #78350f;
+    }
+
     /* Responsive adjustments */
     @media (max-width: 768px) {
         .dashboard-section {
@@ -166,54 +436,51 @@ include '../includes/header.php';
             min-width: 100% !important;
         }
 
-        .table th,
-        .table td {
-            padding: 0.5rem 0.375rem !important;
-        }
-
-    }
-
-    @media (max-width: 576px) {
-        .container {
-            padding: 0 0.75rem !important;
-        }
-
-        .table {
-            min-width: 450px !important;
-            font-size: 0.85rem !important;
-        }
-    }
-
-    /* =========================
-   MOBILE TABLE FIX (FINAL)
-   ========================= */
-    @media (max-width: 768px) {
-
-        /* Hide ALL columns first */
-        .table th,
-        .table td {
+        /* Hide desktop columns, show mobile columns */
+        .desktop-only {
             display: none !important;
         }
 
-        /* 1️⃣ Kode Booking */
-        .table th:nth-child(1),
-        .table td:nth-child(1) {
+        .mobile-only {
             display: table-cell !important;
         }
 
-        /* 7️⃣ Status */
-        .table th:nth-child(7),
-        .table td:nth-child(7) {
+        /* MOBILE TABLE: Show only Kode Booking and Detail button for user bookings */
+        .table:not(.refund-table) th,
+        .table:not(.refund-table) td {
+            display: none !important;
+        }
+
+        /* Show only column 1 (Kode Booking) */
+        .table:not(.refund-table) th:nth-child(1),
+        .table:not(.refund-table) td:nth-child(1) {
             display: table-cell !important;
         }
 
-        /* 9️⃣ Detail button */
-        .table th:nth-child(9),
-        .table td:nth-child(9) {
+        /* Show only column 9 (Detail button) */
+        .table:not(.refund-table) th:nth-child(9),
+        .table:not(.refund-table) td:nth-child(9) {
             display: table-cell !important;
         }
 
-        /* Layout polish */
+        /* Refund table mobile adjustments */
+        .refund-table {
+            width: 100% !important;
+            min-width: unset !important;
+        }
+
+        .refund-table th,
+        .refund-table td {
+            text-align: center !important;
+            vertical-align: middle !important;
+            padding: 0.75rem 0.5rem !important;
+        }
+
+        .refund-table th:nth-child(1),
+        .refund-table td:nth-child(1) {
+            text-align: left !important;
+        }
+
         .table {
             width: 100% !important;
             min-width: unset !important;
@@ -223,31 +490,37 @@ include '../includes/header.php';
         .table td {
             text-align: center !important;
             vertical-align: middle !important;
-            white-space: nowrap !important;
-            padding: 0.5rem !important;
-            font-size: 0.85rem !important;
+            padding: 0.75rem 0.5rem !important;
+        }
+
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+            text-align: left !important;
         }
     }
 
-    /* Desktop only */
-    .mobile-only {
-        display: none;
-    }
+    @media (max-width: 576px) {
+        .container {
+            padding: 0 0.75rem !important;
+        }
 
-    @media (max-width: 768px) {
-        .mobile-only {
-            display: table-cell;
+        .modal-content {
+            margin: 0 0.5rem;
+        }
+
+        .detail-item {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .detail-value {
+            text-align: left;
         }
     }
-
 
     @media (max-width: 400px) {
         .container {
             padding: 0 0.5rem !important;
-        }
-
-        .table {
-            min-width: 400px !important;
         }
 
         .stats-grid .card {
@@ -263,291 +536,507 @@ include '../includes/header.php';
         }
     }
 
-    /* Make status badges smaller so they fit inside the table */
-    .table .badge {
-        font-size: 14px !important;
-        padding: 5px 7px !important;
-        line-height: 1 !important;
-        white-space: nowrap;
+    /* Compact badges */
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 20px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
-    /* Make icon inside badge smaller */
-    .table .badge i {
-        font-size: 13px !important;
+    .badge-success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
     }
 
-    /* For mobile list view alternative */
-    .mobile-list-view {
-        display: none;
+    .badge-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
     }
 
-    /* Compact check-in badge */
-    .badge-checkin {
-        font-size: 11px !important;
-        padding: 2px 6px !important;
-        line-height: 2.2 !important;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
+    .badge-warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
     }
 
-    .badge-checkin i {
-        font-size: 11px !important;
-
+    .badge-info {
+        background: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
     }
 
-    @media (max-width: 350px) {
-        .table-responsive {
-            display: none !important;
-        }
-
-        .mobile-list-view {
-            display: block !important;
-        }
-
-        .mobile-list-view .list-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--light);
-        }
-
-        .mobile-list-view .list-item:last-child {
-            border-bottom: none;
-        }
-
-        .mobile-list-view .badge {
-            font-size: 0.8rem !important;
-        }
+    .btn-detail {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
     }
 
-    /* Mobile-only column */
-    .mobile-only {
-        display: none;
-    }
-
-    @media (max-width: 768px) {
-        .mobile-only {
-            display: table-cell;
-        }
+    .btn-detail:hover {
+        background: #1d4ed8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     }
 </style>
-<div id="bookingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999;">
-    <div style="background:#fff; max-width:420px; margin:15% auto; padding:1.25rem; border-radius:12px;">
-        <h4 style="margin-bottom:1rem;">Detail Pemesanan</h4>
-        <div id="bookingModalContent"></div>
-
-        <button class="btn btn-secondary" style="width:100%; margin-top:1rem;"
-            onclick="closeBookingModal()">Tutup</button>
-    </div>
-</div>
-
-
 
 <section class="dashboard-section" style="background: var(--light);">
     <div class="container">
         <h1 style="margin-bottom: 0.5rem; font-size: clamp(1.5rem, 3vw, 2rem);">Dashboard</h1>
         <p style="color: var(--gray); font-size: clamp(0.875rem, 1.5vw, 1rem);">
-            Selamat datang, Welcome <?php echo htmlspecialchars($_SESSION['full_name']); ?>!
+            Selamat datang, <?php echo htmlspecialchars($_SESSION['full_name']); ?>!
         </p>
     </div>
 </section>
 
 <section class="dashboard-section">
     <div class="container">
-        <!-- Statistics Cards -->
-        <div class="stats-grid">
-            <div class="card" style="background: linear-gradient(135deg, var(--primary), #1d4ed8); color: white;">
-                <i class="fas fa-ticket-alt"></i>
-                <h3><?php echo $total_bookings; ?></h3>
-                <p>Total Pemesanan</p>
-            </div>
-
-            <div class="card" style="background: linear-gradient(135deg, var(--secondary), #059669); color: white;">
-                <i class="fas fa-calendar-check"></i>
-                <h3><?php echo $active_bookings; ?></h3>
-                <p>Booking Aktif</p>
-            </div>
-
-            <div class="card" style="background: linear-gradient(135deg, var(--danger), #dc2626); color: white;">
-                <i class="fas fa-times-circle"></i>
-                <h3><?php echo $cancelled_bookings; ?></h3>
-                <p>Dibatalkan</p>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="dashboard-card">
-            <h3>Aksi Cepat</h3>
-            <div class="quick-actions">
-                <a href="reservation.php" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Pemesanan Baru
-                </a>
-                <a href="check-in.php" class="btn btn-secondary">
-                    <i class="fas fa-check"></i> Check-in
-                </a>
-                <a href="profile.php" class="btn btn-outline" style="color: var(--primary); border-color: var(--primary);">
-                    <i class="fas fa-user"></i> Edit Profil
-                </a>
-                <a href="cancel-request.php" class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);">
-                    <i class="fas fa-ban"></i> Ajukan Pembatalan
-                </a>
-            </div>
-        </div>
-
-        <!-- Pending Cancellations -->
-        <?php if ($pending_cancellations->num_rows > 0): ?>
-            <div class="dashboard-card">
-                <h3>Permintaan Pembatalan Pending</h3>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Kode Booking</th>
-                                <th>Alasan</th>
-                                <th>Status</th>
-                                <th>Tanggal Pengajuan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php while ($cancel = $pending_cancellations->fetch_assoc()): ?>
-                                <tr>
-                                    <td><strong><?php echo htmlspecialchars($cancel['booking_code']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars(substr($cancel['reason'], 0, 50)) . '...'; ?></td>
-                                    <td><span class="badge badge-warning"><?php echo ucfirst($cancel['status']); ?></span></td>
-                                    <td><?php echo format_datetime($cancel['created_at']); ?></td>
-                                </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
+        <?php if ($is_admin_user): ?>
+            <!-- ADMIN DASHBOARD -->
+            
+            <!-- Admin Statistics Cards -->
+            <div class="stats-grid">
+                <div class="card" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+                    <i class="fas fa-ticket-alt"></i>
+                    <h3><?php echo number_format($total_tickets); ?></h3>
+                    <p>Total Tiket Diterbitkan</p>
                 </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                    <i class="fas fa-dollar-sign"></i>
+                    <h3><?php echo format_currency($revenue_this_month); ?></h3>
+                    <p>Pendapatan Bulan Ini</p>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">
+                    <i class="fas fa-chart-line"></i>
+                    <h3><?php echo format_currency($net_profit); ?></h3>
+                    <p>Laba Bersih Bulan Ini</p>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                    <i class="fas fa-user-plus"></i>
+                    <h3><?php echo number_format($new_users_month); ?></h3>
+                    <p>Pengguna Baru Bulan Ini</p>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="dashboard-card">
+                <h3>Aksi Cepat</h3>
+                <div class="quick-actions">
+                    <a href="../admin/dashboard.php" class="btn btn-primary">
+                        <i class="fas fa-cog"></i> Admin Panel
+                    </a>
+                    <a href="../admin/services.php" class="btn btn-secondary">
+                        <i class="fas fa-bus"></i> Kelola Layanan
+                    </a>
+                    <a href="../admin/ticket-check.php" class="btn btn-outline" style="color: var(--primary); border-color: var(--primary);">
+                        <i class="fas fa-ticket-alt"></i> Semua Tiket
+                    </a>
+                    <a href="../admin/cancellations.php" class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);">
+                        <i class="fas fa-ban"></i> Pembatalan
+                    </a>
+                </div>
+            </div>
+
+            <!-- Routes with Zero Bookings -->
+            <?php if ($zero_booking_routes->num_rows > 0): ?>
+                <div class="dashboard-card">
+                    <h3><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Rute Tanpa Pemesanan</h3>
+                    <div class="alert-warning-box">
+                        <strong>Perhatian: Rute berikut belum memiliki pemesanan sama sekali</strong>
+                        <ul>
+                            <?php while ($route = $zero_booking_routes->fetch_assoc()): ?>
+                                <li>
+                                    <strong><?php echo htmlspecialchars($route['service_name']); ?></strong> - 
+                                    <?php echo htmlspecialchars($route['route']); ?>
+                                </li>
+                            <?php endwhile; ?>
+                        </ul>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Refund Reports -->
+            <?php 
+            // Store refund data for mobile view
+            $refund_data = array();
+            if ($refund_reports->num_rows > 0) {
+                $refund_reports->data_seek(0); // Reset pointer
+                while ($row = $refund_reports->fetch_assoc()) {
+                    $refund_data[] = $row;
+                }
+            }
+            ?>
+            <div class="dashboard-card">
+                <h3><i class="fas fa-undo-alt"></i> Laporan Refund Bulan Ini</h3>
+                <?php if (!empty($refund_data)): ?>
+                    <div class="table-responsive">
+                        <table class="table refund-table">
+                            <thead>
+                                <tr>
+                                    <th>Kode Booking</th>
+                                    <th class="desktop-only">Penumpang</th>
+                                    <th class="desktop-only">Layanan</th>
+                                    <th class="desktop-only">Jumlah Refund</th>
+                                    <th class="desktop-only">Diproses</th>
+                                    <th class="mobile-only">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($refund_data as $refund): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($refund['booking_code']); ?></strong></td>
+                                        <td class="desktop-only"><?php echo htmlspecialchars($refund['full_name']); ?></td>
+                                        <td class="desktop-only"><?php echo htmlspecialchars($refund['service_name']); ?></td>
+                                        <td class="desktop-only" style="color: var(--danger); font-weight: 600;">
+                                            <?php echo format_currency($refund['total_price']); ?>
+                                        </td>
+                                        <td class="desktop-only"><?php echo format_datetime($refund['processed_at']); ?></td>
+                                        <td class="mobile-only">
+                                            <button class="btn-detail" onclick='showRefundDetail(<?php echo json_encode([
+                                                "code" => $refund['booking_code'],
+                                                "passenger" => $refund['full_name'],
+                                                "service" => $refund['service_name'],
+                                                "route" => $refund['route'],
+                                                "amount" => format_currency($refund['total_price']),
+                                                "processed" => format_datetime($refund['processed_at']),
+                                                "reason" => $refund['reason']
+                                            ]); ?>)'>
+                                                Detail
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 1rem; padding: 1rem; background: #fee2e2; border-radius: 8px; text-align: center;">
+                        <strong style="color: #991b1b;">Total Refund Bulan Ini: <?php echo format_currency($refunds_this_month); ?></strong>
+                    </div>
+                <?php else: ?>
+                    <p style="text-align: center; padding: 2rem; color: var(--gray);">
+                        Tidak ada refund yang diproses bulan ini.
+                    </p>
+                <?php endif; ?>
+            </div>
+
+        <?php else: ?>
+            <!-- USER DASHBOARD (ORIGINAL) -->
+            
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="card" style="background: linear-gradient(135deg, var(--primary), #1d4ed8); color: white;">
+                    <i class="fas fa-ticket-alt"></i>
+                    <h3><?php echo $total_bookings; ?></h3>
+                    <p>Total Pemesanan</p>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, var(--secondary), #059669); color: white;">
+                    <i class="fas fa-calendar-check"></i>
+                    <h3><?php echo $active_bookings; ?></h3>
+                    <p>Booking Aktif</p>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, var(--danger), #dc2626); color: white;">
+                    <i class="fas fa-times-circle"></i>
+                    <h3><?php echo $cancelled_bookings; ?></h3>
+                    <p>Dibatalkan</p>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="dashboard-card">
+                <h3>Aksi Cepat</h3>
+                <div class="quick-actions">
+                    <a href="reservation.php" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Pemesanan Baru
+                    </a>
+                    <a href="check-in.php" class="btn btn-secondary">
+                        <i class="fas fa-check"></i> Check-in
+                    </a>
+                    <a href="profile.php" class="btn btn-outline" style="color: var(--primary); border-color: var(--primary);">
+                        <i class="fas fa-user"></i> Edit Profil
+                    </a>
+                    <a href="cancel-request.php" class="btn btn-outline" style="color: var(--danger); border-color: var(--danger);">
+                        <i class="fas fa-ban"></i> Ajukan Pembatalan
+                    </a>
+                </div>
+            </div>
+
+            <!-- Pending Cancellations -->
+            <?php if ($pending_cancellations->num_rows > 0): ?>
+                <div class="dashboard-card">
+                    <h3>Permintaan Pembatalan Pending</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Kode Booking</th>
+                                    <th>Alasan</th>
+                                    <th>Status</th>
+                                    <th>Tanggal Pengajuan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php while ($cancel = $pending_cancellations->fetch_assoc()): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($cancel['booking_code']); ?></strong></td>
+                                        <td><?php echo htmlspecialchars(substr($cancel['reason'], 0, 50)) . '...'; ?></td>
+                                        <td><span class="badge badge-warning"><?php echo ucfirst($cancel['status']); ?></span></td>
+                                        <td><?php echo format_datetime($cancel['created_at']); ?></td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Recent Bookings -->
+            <?php
+            $mobile_bookings = array();
+            if ($recent_bookings->num_rows > 0) {
+                while ($row = $recent_bookings->fetch_assoc()) {
+                    $mobile_bookings[] = $row;
+                }
+            }
+            ?>
+
+            <div class="dashboard-card">
+                <h3>Pemesanan Terakhir</h3>
+                <?php if (!empty($mobile_bookings)): ?>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Kode Booking</th>
+                                    <th>Layanan</th>
+                                    <th>Rute</th>
+                                    <th>Tanggal</th>
+                                    <th>Penumpang</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Check-in</th>
+                                    <th class="mobile-only">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($mobile_bookings as $booking): ?>
+                                    <?php
+                                    $status_class = $booking['booking_status'] === 'confirmed'
+                                        ? 'success'
+                                        : ($booking['booking_status'] === 'cancelled' ? 'danger' : 'info');
+                                    ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($booking['booking_code']); ?></strong></td>
+                                        <td><?php echo htmlspecialchars($booking['service_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($booking['route']); ?></td>
+                                        <td><?php echo format_date($booking['travel_date']); ?></td>
+                                        <td><?php echo $booking['num_passengers']; ?> orang</td>
+                                        <td><?php echo format_currency($booking['total_price']); ?></td>
+                                        <td>
+                                            <span class="badge badge-<?php echo $status_class; ?>">
+                                                <?php echo ucfirst($booking['booking_status']); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($booking['checked_in']): ?>
+                                                <span class="badge badge-success">
+                                                    <i class="fas fa-check"></i> Sudah
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="badge badge-warning">Belum</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="mobile-only">
+                                            <button class="btn-detail" onclick='showBookingDetail(<?php echo json_encode([
+                                                "code" => $booking['booking_code'],
+                                                "service" => $booking['service_name'],
+                                                "route" => $booking['route'],
+                                                "date" => format_date($booking['travel_date']),
+                                                "passengers" => $booking['num_passengers'] . ' orang',
+                                                "total" => format_currency($booking['total_price']),
+                                                "status" => ucfirst($booking['booking_status']),
+                                                "statusClass" => $status_class,
+                                                "checkin" => $booking['checked_in'] ? 'Sudah' : 'Belum'
+                                            ]); ?>)'>
+                                                Detail
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p style="text-align: center; padding: 2rem; color: var(--gray);">
+                        Belum ada pemesanan. <a href="reservation.php" style="color: var(--primary);">Buat pemesanan pertama Anda</a>
+                    </p>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
-
-        <!-- Recent Bookings -->
-        <?php
-        // Reset recent bookings query for mobile view
-        $recent_bookings = $conn->query("SELECT r.*, s.service_name, s.route 
-            FROM reservations r 
-            JOIN services s ON r.service_id = s.id 
-            WHERE r.user_id = $user_id 
-            ORDER BY r.created_at DESC 
-            LIMIT 5");
-
-        $mobile_bookings = array();
-        if ($recent_bookings->num_rows > 0) {
-            while ($row = $recent_bookings->fetch_assoc()) {
-                $mobile_bookings[] = $row;
-            }
-        }
-        ?>
-
-        <div class="dashboard-card">
-            <h3>Pemesanan Terakhir</h3>
-            <?php if (!empty($mobile_bookings)): ?>
-                <!-- Desktop/Tablet View -->
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Kode Booking</th>
-                                <th>Layanan</th>
-                                <th>Rute</th>
-                                <th>Tanggal</th>
-                                <th>Penumpang</th>
-                                <th>Total</th>
-                                <th>Status</th>
-                                <th>Check-in</th>
-                                <th class="mobile-only">Detail</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            <?php foreach ($mobile_bookings as $booking): ?>
-                                <?php
-                                $status_class = $booking['booking_status'] === 'confirmed'
-                                    ? 'success'
-                                    : ($booking['booking_status'] === 'cancelled' ? 'danger' : 'info');
-                                ?>
-                                <tr>
-                                    <td><strong><?php echo htmlspecialchars($booking['booking_code']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($booking['service_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($booking['route']); ?></td>
-                                    <td><?php echo format_date($booking['travel_date']); ?></td>
-                                    <td><?php echo $booking['num_passengers']; ?> orang</td>
-                                    <td><?php echo format_currency($booking['total_price']); ?></td>
-
-                                    <td>
-                                        <span class="badge badge-<?php echo $status_class; ?>">
-                                            <?php echo ucfirst($booking['booking_status']); ?>
-                                        </span>
-                                    </td>
-
-                                    <td>
-                                        <?php if ($booking['checked_in']): ?>
-                                            <span class="badge badge-success badge-checkin">
-                                                <i class="fas fa-check"></i> Sudah
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning badge-checkin">Belum</span>
-                                        <?php endif; ?>
-                                    </td>
-
-                                    <!-- ✅ NEW: Mobile Detail Button -->
-                                    <td class="mobile-only">
-                                        <button class="btn btn-primary btn-sm"
-                                            onclick="showBookingDetail(
-                    '<?php echo $booking['booking_code']; ?>',
-                    '<?php echo $booking['service_name']; ?>',
-                    '<?php echo $booking['route']; ?>',
-                    '<?php echo format_date($booking['travel_date']); ?>',
-                    '<?php echo $booking['num_passengers']; ?>',
-                    '<?php echo format_currency($booking['total_price']); ?>',
-                    '<?php echo ucfirst($booking['booking_status']); ?>',
-                    '<?php echo $booking['checked_in'] ? 'Sudah' : 'Belum'; ?>'
-                )">
-                                            Detail
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-
-                    </table>
-                </div>
-
-                <!-- Mobile Card View for very small screens -->
-                <div class="mobile-list-view">
-                    <?php foreach ($mobile_bookings as $booking):
-                        $status_class = $booking['booking_status'] === 'confirmed' ? 'success' : ($booking['booking_status'] === 'cancelled' ? 'danger' : 'info');
-                    ?>
-                        <div class="list-item">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap;">
-                                <strong style="font-size: 0.95rem;"><?php echo htmlspecialchars($booking['booking_code']); ?></strong>
-                                <span class="badge badge-<?php echo $status_class; ?>" style="font-size: 0.8rem;">
-                                    <?php echo ucfirst($booking['booking_status']); ?>
-                                </span>
-                            </div>
-                            <div style="font-size: 0.9rem; color: var(--gray);">
-                                <div style="font-weight: 500; margin-bottom: 0.25rem;"><?php echo htmlspecialchars($booking['service_name']); ?></div>
-                                <div style="margin-bottom: 0.5rem;"><?php echo htmlspecialchars($booking['route']); ?></div>
-                                <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                                    <span><?php echo format_date($booking['travel_date']); ?></span>
-                                    <span><?php echo $booking['num_passengers']; ?> orang</span>
-                                    <span style="font-weight: 600;"><?php echo format_currency($booking['total_price']); ?></span>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <p style="text-align: center; padding: 2rem; color: var(--gray);">
-                    Belum ada pemesanan. <a href="reservation.php" style="color: var(--primary);">Buat pemesanan pertama Anda</a>
-                </p>
-            <?php endif; ?>
-        </div>
     </div>
 </section>
 
+<!-- Modal (for user dashboard) -->
+<?php if (!$is_admin_user): ?>
+<div id="bookingModal" class="modal" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4 class="modal-title">Detail Pemesanan</h4>
+            <button class="close-modal" onclick="closeBookingModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="bookingModalContent">
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Refund Detail Modal (for admin) -->
+<?php if ($is_admin_user): ?>
+<div id="refundModal" class="refund-modal" onclick="closeRefundModalOnBackdrop(event)">
+    <div class="refund-modal-content">
+        <div class="refund-modal-header">
+            <h4 class="refund-modal-title">
+                <i class="fas fa-undo-alt"></i> Detail Refund
+            </h4>
+            <button class="close-modal" onclick="closeRefundModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="refund-modal-body" id="refundModalContent">
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
+    // User booking detail modal functions
+    function showBookingDetail(data) {
+        const modalContent = document.getElementById('bookingModalContent');
+
+        modalContent.innerHTML = `
+            <div class="detail-item">
+                <span class="detail-label">Kode Booking</span>
+                <span class="detail-value">${data.code}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Layanan</span>
+                <span class="detail-value">${data.service}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Rute</span>
+                <span class="detail-value">${data.route}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Tanggal</span>
+                <span class="detail-value">${data.date}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Penumpang</span>
+                <span class="detail-value">${data.passengers}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Total</span>
+                <span class="detail-value" style="color: var(--secondary); font-size: 1.1rem;">${data.total}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Status</span>
+                <span class="badge badge-${data.statusClass}">${data.status}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Check-in</span>
+                <span class="detail-value">${data.checkin}</span>
+            </div>
+        `;
+
+        document.getElementById('bookingModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeBookingModal() {
+        document.getElementById('bookingModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    function closeModalOnBackdrop(event) {
+        if (event.target.id === 'bookingModal') {
+            closeBookingModal();
+        }
+    }
+
+    // Admin refund detail modal functions
+    function showRefundDetail(data) {
+        const modalContent = document.getElementById('refundModalContent');
+
+        modalContent.innerHTML = `
+            <div class="refund-detail-item">
+                <span class="refund-detail-label"><i class="fas fa-barcode"></i> Kode Booking</span>
+                <span class="refund-detail-value">${data.code}</span>
+            </div>
+            <div class="refund-detail-item">
+                <span class="refund-detail-label"><i class="fas fa-user"></i> Penumpang</span>
+                <span class="refund-detail-value">${data.passenger}</span>
+            </div>
+            <div class="refund-detail-item">
+                <span class="refund-detail-label"><i class="fas fa-bus"></i> Layanan</span>
+                <span class="refund-detail-value">${data.service}</span>
+            </div>
+            <div class="refund-detail-item">
+                <span class="refund-detail-label"><i class="fas fa-route"></i> Rute</span>
+                <span class="refund-detail-value">${data.route}</span>
+            </div>
+            <div class="refund-detail-item refund-amount-highlight">
+                <span class="refund-detail-label"><i class="fas fa-money-bill-wave"></i> Jumlah Refund</span>
+                <span class="refund-detail-value">${data.amount}</span>
+            </div>
+            <div class="refund-detail-item">
+                <span class="refund-detail-label"><i class="fas fa-calendar-check"></i> Diproses</span>
+                <span class="refund-detail-value">${data.processed}</span>
+            </div>
+            <div class="refund-detail-item refund-reason-box">
+                <span class="refund-detail-label"><i class="fas fa-comment-alt"></i> Alasan Pembatalan</span>
+                <span class="refund-detail-value">${data.reason}</span>
+            </div>
+        `;
+
+        document.getElementById('refundModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeRefundModal() {
+        document.getElementById('refundModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    function closeRefundModalOnBackdrop(event) {
+        if (event.target.id === 'refundModal') {
+            closeRefundModal();
+        }
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeBookingModal();
+            closeRefundModal();
+        }
+    });
+
+    // Dropdown functionality
     document.addEventListener('DOMContentLoaded', function() {
         const dropdowns = document.querySelectorAll('.dropdown');
 
@@ -557,20 +1046,16 @@ include '../includes/header.php';
 
             if (!toggle) return;
 
-            // Prevent clicks inside menu from bubbling up (so document click doesn't close it)
             if (menu) {
                 menu.addEventListener('click', function(ev) {
                     ev.stopPropagation();
                 });
             }
 
-            // Click support (mobile + desktop)
             toggle.addEventListener('click', function(e) {
-                // stop the click from bubbling to document click handler
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Toggle only this menu
                 dropdowns.forEach(d => {
                     if (d !== dropdown) d.classList.remove('active');
                 });
@@ -578,21 +1063,18 @@ include '../includes/header.php';
                 dropdown.classList.toggle('active');
             });
 
-            // Add slight delay before closing on mouse leave (desktop)
             let timeout;
             dropdown.addEventListener('mouseenter', function() {
                 clearTimeout(timeout);
-                // show on hover as well
                 dropdown.classList.add('active');
             });
 
             dropdown.addEventListener('mouseleave', function() {
                 timeout = setTimeout(() => {
                     dropdown.classList.remove('active');
-                }, 250); // 250ms delay - smooth experience when moving pointer
+                }, 250);
             });
 
-            // keyboard accessibility: Enter/Space toggles, Escape closes
             toggle.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -604,46 +1086,25 @@ include '../includes/header.php';
             });
         });
 
-        // Close when clicking outside - but allow clicks inside .navbar or inside any .dropdown
         document.addEventListener('click', function(e) {
-            // If the click is inside navbar or any dropdown, do nothing
             if (e.target.closest('.navbar') || e.target.closest('.dropdown')) {
                 return;
             }
-
-            // Otherwise close all dropdowns
             dropdowns.forEach(dropdown => dropdown.classList.remove('active'));
         });
 
-        // Also close on Escape globally
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 dropdowns.forEach(dropdown => dropdown.classList.remove('active'));
             }
         });
     });
-
-    function showBookingDetail(kode, layanan, rute, tanggal, penumpang, total, status, checkin) {
-        document.getElementById('bookingModalContent').innerHTML = `
-        <p><strong>Kode:</strong> ${kode}</p>
-        <p><strong>Layanan:</strong> ${layanan}</p>
-        <p><strong>Rute:</strong> ${rute}</p>
-        <p><strong>Tanggal:</strong> ${tanggal}</p>
-        <p><strong>Penumpang:</strong> ${penumpang}</p>
-        <p><strong>Total:</strong> ${total}</p>
-        <p><strong>Status:</strong> ${status}</p>
-        <p><strong>Check-in:</strong> ${checkin}</p>
-    `;
-        document.getElementById('bookingModal').style.display = 'block';
-    }
-
-    function closeBookingModal() {
-        document.getElementById('bookingModal').style.display = 'none';
-    }
 </script>
 
-
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

@@ -49,7 +49,13 @@ if ($result->num_rows === 0) {
         'message' => 'Booking not found'
     ]);
     $stmt->close();
-    closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
     exit();
 }
 
@@ -62,7 +68,10 @@ if ($booking['payment_status'] === 'paid') {
         'success' => false,
         'message' => 'Payment already completed'
     ]);
-    closeDBConnection($conn);
+    if (isset($conn) && $conn instanceof mysqli) {
+        $conn->close();
+    }
+
     exit();
 }
 
@@ -73,7 +82,10 @@ if ($amount != $booking['total_price']) {
         'success' => false,
         'message' => 'Payment amount mismatch'
     ]);
-    closeDBConnection($conn);
+    if (isset($conn) && $conn instanceof mysqli) {
+        $conn->close();
+    }
+
     exit();
 }
 
@@ -130,4 +142,7 @@ if ($is_successful) {
     ]);
 }
 
-closeDBConnection($conn);
+
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}

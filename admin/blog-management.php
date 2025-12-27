@@ -1,4 +1,9 @@
 <?php
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 $page_title = 'Manajemen Blog';
 require_once '../config/config.php';
 require_login();
@@ -8,6 +13,10 @@ $conn = getDBConnection();
 $error = '';
 $success = '';
 
+// Check if content_images column exists
+$column_check = $conn->query("SHOW COLUMNS FROM blog_articles LIKE 'content_images'");
+$has_content_images = $column_check->num_rows > 0;
+
 // Handle delete featured image
 if (isset($_GET['delete_featured']) && isset($_GET['article_id'])) {
     $article_id = (int)$_GET['article_id'];
@@ -15,7 +24,7 @@ if (isset($_GET['delete_featured']) && isset($_GET['article_id'])) {
     $result = $conn->query("SELECT featured_image FROM blog_articles WHERE id = $article_id");
     if ($result && $row = $result->fetch_assoc()) {
         $image_path = '../' . $row['featured_image'];
-        if (file_exists($image_path)) {
+        if (file_exists($image_path) && $row['featured_image']) {
             unlink($image_path);
         }
 
@@ -26,15 +35,15 @@ if (isset($_GET['delete_featured']) && isset($_GET['article_id'])) {
     }
 }
 
-// Handle delete content image
-if (isset($_GET['delete_content_image']) && isset($_GET['article_id']) && isset($_GET['image_index'])) {
+// Handle delete content image (only if column exists)
+if ($has_content_images && isset($_GET['delete_content_image']) && isset($_GET['article_id']) && isset($_GET['image_index'])) {
     $article_id = (int)$_GET['article_id'];
     $image_index = (int)$_GET['image_index'];
 
     $result = $conn->query("SELECT content_images FROM blog_articles WHERE id = $article_id");
     if ($result && $row = $result->fetch_assoc()) {
         $content_images_json = $row['content_images'];
-        $images = !empty($content_images_json) ? json_decode($content_images_json, true) : [];
+        $images = !empty($content_images_json) && $content_images_json !== 'null' ? json_decode($content_images_json, true) : [];
 
         if (isset($images[$image_index])) {
             $image_path = '../' . $images[$image_index];
@@ -75,11 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = '../uploads/blog/';
             if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+                mkdir($upload_dir, 0755, true);
             }
 
             $file_ext = strtolower(pathinfo($_FILES['featured_image']['name'], PATHINFO_EXTENSION));
-            $allowed = ['jpg', 'jpeg', 'png'];
+            $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
             if (in_array($file_ext, $allowed)) {
                 $featured_image = 'uploads/blog/' . uniqid() . '.' . $file_ext;
@@ -87,25 +96,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Handle content images
-        $content_images = [];
-        for ($i = 1; $i <= 3; $i++) {
-            if (isset($_FILES["content_image_$i"]) && $_FILES["content_image_$i"]['error'] === UPLOAD_ERR_OK) {
-                $upload_dir = '../uploads/blog/';
-                $file_ext = strtolower(pathinfo($_FILES["content_image_$i"]['name'], PATHINFO_EXTENSION));
-                $allowed = ['jpg', 'jpeg', 'png'];
+        // Handle content images if column exists
+        $content_images_json = '[]'; // Default empty array
+        if ($has_content_images) {
+            $content_images = [];
+            for ($i = 1; $i <= 3; $i++) {
+                if (isset($_FILES["content_image_$i"]) && $_FILES["content_image_$i"]['error'] === UPLOAD_ERR_OK) {
+                    $upload_dir = '../uploads/blog/';
+                    if (!file_exists($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
 
-                if (in_array($file_ext, $allowed)) {
-                    $img_path = 'uploads/blog/' . uniqid() . '.' . $file_ext;
-                    move_uploaded_file($_FILES["content_image_$i"]['tmp_name'], '../' . $img_path);
-                    $content_images[] = $img_path;
+                    $file_ext = strtolower(pathinfo($_FILES["content_image_$i"]['name'], PATHINFO_EXTENSION));
+                    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+                    if (in_array($file_ext, $allowed)) {
+                        $img_path = 'uploads/blog/' . uniqid() . '.' . $file_ext;
+                        move_uploaded_file($_FILES["content_image_$i"]['tmp_name'], '../' . $img_path);
+                        $content_images[] = $img_path;
+                    }
                 }
             }
+            $content_images_json = json_encode($content_images);
         }
-        $content_images_json = json_encode($content_images);
 
-        $stmt = $conn->prepare("INSERT INTO blog_articles (title, slug, content, excerpt, featured_image, content_images, author_id, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssss", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $author_id, $status, $published_at);
+        if ($has_content_images) {
+            $stmt = $conn->prepare("INSERT INTO blog_articles (title, slug, content, excerpt, featured_image, content_images, author_id, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("sssssssss", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $author_id, $status, $published_at);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO blog_articles (title, slug, content, excerpt, featured_image, author_id, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("sssssiss", $title, $slug, $content, $excerpt, $featured_image, $author_id, $status, $published_at);
+        }
 
         if ($stmt->execute()) {
             log_activity($conn, $author_id, 'add_article', "Added article: $title");
@@ -122,18 +143,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $excerpt = clean_input($_POST['excerpt']);
         $status = clean_input($_POST['status']);
 
-        $current = $conn->query("SELECT status, published_at, featured_image, content_images FROM blog_articles WHERE id = $article_id")->fetch_assoc();
+        $current = $conn->query("SELECT status, published_at, featured_image" . ($has_content_images ? ", content_images" : "") . " FROM blog_articles WHERE id = $article_id")->fetch_assoc();
 
         // Handle featured image update
-        $featured_image = $current['featured_image'];
+        $featured_image = $current['featured_image'] ?? '';
         if (isset($_FILES['edit_featured_image']) && $_FILES['edit_featured_image']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = '../uploads/blog/';
             if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+                mkdir($upload_dir, 0755, true);
             }
 
             $file_ext = strtolower(pathinfo($_FILES['edit_featured_image']['name'], PATHINFO_EXTENSION));
-            $allowed = ['jpg', 'jpeg', 'png'];
+            $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
             if (in_array($file_ext, $allowed)) {
                 if ($featured_image && file_exists('../' . $featured_image)) {
@@ -145,31 +166,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Handle content images update
-        $content_images_json = $current['content_images'];
-        $content_images = !empty($content_images_json) ? json_decode($content_images_json, true) : [];
-        for ($i = 1; $i <= 3; $i++) {
-            if (isset($_FILES["edit_content_image_$i"]) && $_FILES["edit_content_image_$i"]['error'] === UPLOAD_ERR_OK) {
-                $upload_dir = '../uploads/blog/';
-                $file_ext = strtolower(pathinfo($_FILES["edit_content_image_$i"]['name'], PATHINFO_EXTENSION));
-                $allowed = ['jpg', 'jpeg', 'png'];
+        // Handle content images update if column exists
+        $content_images_json = $current['content_images'] ?? '[]';
+        if ($has_content_images) {
+            $content_images = !empty($content_images_json) && $content_images_json !== 'null' ? json_decode($content_images_json, true) : [];
+            for ($i = 1; $i <= 3; $i++) {
+                if (isset($_FILES["edit_content_image_$i"]) && $_FILES["edit_content_image_$i"]['error'] === UPLOAD_ERR_OK) {
+                    $upload_dir = '../uploads/blog/';
+                    if (!file_exists($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
 
-                if (in_array($file_ext, $allowed)) {
-                    $img_path = 'uploads/blog/' . uniqid() . '.' . $file_ext;
-                    move_uploaded_file($_FILES["edit_content_image_$i"]['tmp_name'], '../' . $img_path);
-                    $content_images[] = $img_path;
+                    $file_ext = strtolower(pathinfo($_FILES["edit_content_image_$i"]['name'], PATHINFO_EXTENSION));
+                    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+                    if (in_array($file_ext, $allowed)) {
+                        $img_path = 'uploads/blog/' . uniqid() . '.' . $file_ext;
+                        move_uploaded_file($_FILES["edit_content_image_$i"]['tmp_name'], '../' . $img_path);
+                        $content_images[] = $img_path;
+                    }
                 }
             }
+            $content_images_json = json_encode($content_images);
         }
-        $content_images_json = json_encode($content_images);
 
         if ($status === 'published' && $current['status'] !== 'published') {
             $published_at = date('Y-m-d H:i:s');
-            $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, content_images = ?, status = ?, published_at = ? WHERE id = ?");
-            $stmt->bind_param("ssssssssi", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $status, $published_at, $article_id);
+            if ($has_content_images) {
+                $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, content_images = ?, status = ?, published_at = ? WHERE id = ?");
+                $stmt->bind_param("ssssssssi", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $status, $published_at, $article_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, status = ?, published_at = ? WHERE id = ?");
+                $stmt->bind_param("sssssssi", $title, $slug, $content, $excerpt, $featured_image, $status, $published_at, $article_id);
+            }
         } else {
-            $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, content_images = ?, status = ? WHERE id = ?");
-            $stmt->bind_param("sssssssi", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $status, $article_id);
+            if ($has_content_images) {
+                $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, content_images = ?, status = ? WHERE id = ?");
+                $stmt->bind_param("sssssssi", $title, $slug, $content, $excerpt, $featured_image, $content_images_json, $status, $article_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE blog_articles SET title = ?, slug = ?, content = ?, excerpt = ?, featured_image = ?, status = ? WHERE id = ?");
+                $stmt->bind_param("ssssssi", $title, $slug, $content, $excerpt, $featured_image, $status, $article_id);
+            }
         }
 
         if ($stmt->execute()) {
@@ -182,18 +219,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['delete_article'])) {
         $article_id = intval($_POST['article_id']);
 
-        $result = $conn->query("SELECT featured_image, content_images FROM blog_articles WHERE id = $article_id");
+        $result = $conn->query("SELECT featured_image" . ($has_content_images ? ", content_images" : "") . " FROM blog_articles WHERE id = $article_id");
         if ($result && $row = $result->fetch_assoc()) {
-            if ($row['featured_image'] && file_exists('../' . $row['featured_image'])) {
+            // Delete featured image
+            if (!empty($row['featured_image']) && file_exists('../' . $row['featured_image'])) {
                 unlink('../' . $row['featured_image']);
             }
 
-            $content_images_json = $row['content_images'];
-            $content_images = !empty($content_images_json) ? json_decode($content_images_json, true) : [];
-            if ($content_images) {
-                foreach ($content_images as $img) {
-                    if (file_exists('../' . $img)) {
-                        unlink('../' . $img);
+            // Delete content images if column exists
+            if ($has_content_images && !empty($row['content_images']) && $row['content_images'] !== 'null') {
+                $content_images = json_decode($row['content_images'], true);
+                if (is_array($content_images)) {
+                    foreach ($content_images as $img) {
+                        if (!empty($img) && file_exists('../' . $img)) {
+                            unlink('../' . $img);
+                        }
                     }
                 }
             }
@@ -222,6 +262,48 @@ include '../includes/header.php';
 ?>
 
 <style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+    }
+
+    /* Card styling with better centering */
+    .card {
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #64a07fb0 0%, #75d370ff 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px 12px 0 0;
+        margin: 0;
+        border: none;
+    }
+
+    .card-header .card-title {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header .card-title i {
+        font-size: 1.3rem;
+    }
+
+    /* Form styling */
+    .card form {
+        padding: 1.5rem;
+    }
+
     .image-preview {
         max-width: 200px;
         max-height: 150px;
@@ -294,6 +376,11 @@ include '../includes/header.php';
         .articles-mobile {
             display: none;
         }
+
+        /* Table container padding */
+        .articles-desktop {
+            padding: 1.5rem;
+        }
     }
 
     /* Mobile Cards */
@@ -304,6 +391,14 @@ include '../includes/header.php';
 
         .articles-mobile {
             display: block;
+        }
+
+        .container {
+            padding: 0 1rem;
+        }
+
+        .card-header .card-title {
+            font-size: 1.2rem;
         }
     }
 
@@ -397,8 +492,185 @@ include '../includes/header.php';
     .modal-backdrop.show {
         display: flex;
     }
-</style>
 
+    .modal-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    .modal-backdrop .card {
+        max-width: 800px;
+        width: 95%;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Enhanced table styling */
+    .table {
+        width: 100%;
+        margin: 0;
+    }
+
+    .table thead tr {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+
+    .table thead th {
+        font-weight: 600;
+        color: #ffffffff;
+        padding: 1rem;
+    }
+
+    .table tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Action buttons styling - Desktop */
+    .action-buttons-container {
+        display: flex;
+        gap: 1px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .action-buttons-container .btn {
+        padding: 0.4rem 0.6rem;
+        margin: 0;
+    }
+
+    .action-buttons-container form {
+        margin: 0;
+        display: inline;
+    }
+
+    /* Table action column */
+    .table td.action-column {
+        white-space: nowrap;
+        text-align: center;
+        padding: 0.75rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .card form {
+            padding: 1rem;
+        }
+
+        /* Mobile badge sizing */
+        .badge {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* Mobile table adjustments */
+        .table {
+            font-size: 0.85rem;
+        }
+
+        .table td,
+        .table th {
+            padding: 0.5rem 0.25rem;
+        }
+
+        /* Action buttons in mobile table if visible */
+        .action-buttons-container {
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .action-buttons-container .btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    .action-buttons-container {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: nowrap;
+    }
+
+    .action-buttons-container .btn {
+        padding: 0.4rem 0.6rem;
+        margin: 0;
+        white-space: nowrap;
+        /* Added to prevent text wrapping */
+    }
+
+    .action-buttons-container form {
+        margin: 0;
+        display: inline;
+    }
+
+    .modal-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 100%;
+        padding: 2rem 0;
+
+    }
+
+    .modal-backdrop .card {
+        max-width: 800px;
+        width: 95%;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        margin: auto;
+    }
+
+    @media (max-width: 768px) {
+        .modal-container {
+            padding: 1rem 0;
+        }
+
+        .modal-backdrop .card {
+            width: 100%;
+            max-height: 95vh;
+        }
+
+        #editModal #edit_title {
+            min-height: 60px;
+        }
+
+        #editModal #edit_excerpt {
+            min-height: 100px;
+        }
+
+        #editModal #edit_content {
+            min-height: 200px;
+        }
+
+        #editModal .card>div:last-child {
+            padding: 1rem;
+        }
+
+        #editModal .card>div:last-child>div {
+            flex-direction: column;
+        }
+
+        #editModal .card>div:last-child .btn {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        #editModal .card>div:last-child .btn:last-child {
+            margin-bottom: 0;
+        }
+    }
+</style>
 <section style="padding: 2rem 0; background: var(--light);">
     <div class="container">
         <h1><i class="fas fa-blog"></i> Manajemen Blog</h1>
@@ -441,7 +713,7 @@ include '../includes/header.php';
                 <div class="form-group">
                     <label for="featured_image">Gambar Utama *</label>
                     <input type="file" name="featured_image" id="featured_image" class="form-control" accept="image/*" required onchange="previewImage(this, 'featured_preview')">
-                    <small style="color: var(--gray);">JPG, PNG (Max 2MB)</small>
+                    <small style="color: var(--gray);">JPG, PNG, GIF, WebP (Max 2MB)</small>
                     <img id="featured_preview" class="image-preview" alt="Preview">
                 </div>
 
@@ -450,27 +722,29 @@ include '../includes/header.php';
                     <textarea name="content" id="content" class="form-control" rows="8" placeholder="Tulis konten artikel..." required></textarea>
                 </div>
 
-                <div style="background: var(--light); padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0;">
-                    <h4 style="margin-bottom: 1rem;"><i class="fas fa-images"></i> Gambar Dalam Artikel (Opsional)</h4>
+                <?php if ($has_content_images): ?>
+                    <div style="background: var(--light); padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0;">
+                        <h4 style="margin-bottom: 1rem;"><i class="fas fa-images"></i> Gambar Dalam Artikel (Opsional)</h4>
 
-                    <div class="form-group">
-                        <label for="content_image_1">Gambar 1</label>
-                        <input type="file" name="content_image_1" id="content_image_1" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_1')">
-                        <img id="content_preview_1" class="image-preview" alt="Preview 1">
-                    </div>
+                        <div class="form-group">
+                            <label for="content_image_1">Gambar 1</label>
+                            <input type="file" name="content_image_1" id="content_image_1" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_1')">
+                            <img id="content_preview_1" class="image-preview" alt="Preview 1">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="content_image_2">Gambar 2</label>
-                        <input type="file" name="content_image_2" id="content_image_2" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_2')">
-                        <img id="content_preview_2" class="image-preview" alt="Preview 2">
-                    </div>
+                        <div class="form-group">
+                            <label for="content_image_2">Gambar 2</label>
+                            <input type="file" name="content_image_2" id="content_image_2" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_2')">
+                            <img id="content_preview_2" class="image-preview" alt="Preview 2">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="content_image_3">Gambar 3</label>
-                        <input type="file" name="content_image_3" id="content_image_3" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_3')">
-                        <img id="content_preview_3" class="image-preview" alt="Preview 3">
+                        <div class="form-group">
+                            <label for="content_image_3">Gambar 3</label>
+                            <input type="file" name="content_image_3" id="content_image_3" class="form-control" accept="image/*" onchange="previewImage(this, 'content_preview_3')">
+                            <img id="content_preview_3" class="image-preview" alt="Preview 3">
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
                 <div class="form-group">
                     <label for="status">Status *</label>
@@ -526,20 +800,35 @@ include '../includes/header.php';
                                         <?php echo ucfirst($article['status']); ?>
                                     </span>
                                 </td>
-                                <td><?php echo $article['published_at'] ? format_date($article['published_at']) : '-'; ?></td>
-                                <td style="white-space: nowrap; text-align: center;">
-                                    <a href="<?php echo SITE_URL; ?>/blog/article.php?slug=<?php echo $article['slug']; ?>" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <button onclick='editArticle(<?php echo json_encode($article, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)' class="btn btn-secondary" style="padding: 0.4rem 0.8rem;">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <form method="POST" action="" style="display: inline;" onsubmit="return confirm('Yakin ingin menghapus artikel ini?')">
-                                        <input type="hidden" name="article_id" value="<?php echo $article['id']; ?>">
-                                        <button type="submit" name="delete_article" class="btn btn-danger" style="padding: 0.4rem 0.8rem;">
-                                            <i class="fas fa-trash"></i>
+                                <td>
+                                    <?php
+                                    if ($article['published_at']) {
+                                        // Use format_date if exists, otherwise format manually
+                                        if (function_exists('format_date')) {
+                                            echo format_date($article['published_at']);
+                                        } else {
+                                            echo date('d M Y', strtotime($article['published_at']));
+                                        }
+                                    } else {
+                                        echo '-';
+                                    }
+                                    ?>
+                                </td>
+                                <td class="action-column">
+                                    <div class="action-buttons-container">
+                                        <a href="<?php echo SITE_URL; ?>/blog/article.php?slug=<?php echo $article['slug']; ?>" target="_blank" class="btn btn-secondary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button onclick='editArticle(<?php echo json_encode($article, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)' class="btn btn-secondary">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                    </form>
+                                        <form method="POST" action="" onsubmit="return confirm('Yakin ingin menghapus artikel ini?')">
+                                            <input type="hidden" name="article_id" value="<?php echo $article['id']; ?>">
+                                            <button type="submit" name="delete_article" class="btn btn-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -572,7 +861,19 @@ include '../includes/header.php';
                             </div>
                             <div class="article-card-info-item">
                                 <div class="article-card-info-label">Published:</div>
-                                <div><?php echo $article['published_at'] ? format_date($article['published_at']) : '-'; ?></div>
+                                <div>
+                                    <?php
+                                    if ($article['published_at']) {
+                                        if (function_exists('format_date')) {
+                                            echo format_date($article['published_at']);
+                                        } else {
+                                            echo date('d M Y', strtotime($article['published_at']));
+                                        }
+                                    } else {
+                                        echo '-';
+                                    }
+                                    ?>
+                                </div>
                             </div>
                         </div>
 
@@ -600,7 +901,7 @@ include '../includes/header.php';
 <!-- Edit Modal -->
 <div id="editModal" class="modal-backdrop">
     <div class="modal-container">
-        <div class="card" style="max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="card">
             <div class="card-header" style="position: sticky; top: 0; background: white; z-index: 10;">
                 <h3 class="card-title">Edit Artikel</h3>
             </div>
@@ -608,6 +909,7 @@ include '../includes/header.php';
             <div style="overflow-y: auto; flex: 1; padding: 1.5rem;">
                 <form method="POST" action="" enctype="multipart/form-data" id="editForm">
                     <input type="hidden" name="article_id" id="edit_article_id">
+                    <input type="hidden" name="edit_article" value="1">
 
                     <div class="form-group">
                         <label for="edit_title">Judul</label>
@@ -634,33 +936,35 @@ include '../includes/header.php';
                         <textarea name="content" id="edit_content" class="form-control" rows="10" required></textarea>
                     </div>
 
-                    <div style="background: var(--light); padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0;">
-                        <h4 style="margin-bottom: 1rem;"><i class="fas fa-images"></i> Gambar Dalam Artikel</h4>
+                    <?php if ($has_content_images): ?>
+                        <div style="background: var(--light); padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0;">
+                            <h4 style="margin-bottom: 1rem;"><i class="fas fa-images"></i> Gambar Dalam Artikel</h4>
 
-                        <div class="form-group">
-                            <label>Gambar Saat Ini</label>
-                            <div id="current_content_images_container" class="current-images"></div>
+                            <div class="form-group">
+                                <label>Gambar Saat Ini</label>
+                                <div id="current_content_images_container" class="current-images"></div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tambah Gambar Baru</label>
+
+                                <div class="form-group">
+                                    <input type="file" name="edit_content_image_1" id="edit_content_image_1" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_1')">
+                                    <img id="edit_content_preview_1" class="image-preview" alt="Preview 1">
+                                </div>
+
+                                <div class="form-group">
+                                    <input type="file" name="edit_content_image_2" id="edit_content_image_2" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_2')">
+                                    <img id="edit_content_preview_2" class="image-preview" alt="Preview 2">
+                                </div>
+
+                                <div class="form-group">
+                                    <input type="file" name="edit_content_image_3" id="edit_content_image_3" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_3')">
+                                    <img id="edit_content_preview_3" class="image-preview" alt="Preview 3">
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="form-group">
-                            <label>Tambah Gambar Baru</label>
-
-                            <div class="form-group">
-                                <input type="file" name="edit_content_image_1" id="edit_content_image_1" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_1')">
-                                <img id="edit_content_preview_1" class="image-preview" alt="Preview 1">
-                            </div>
-
-                            <div class="form-group">
-                                <input type="file" name="edit_content_image_2" id="edit_content_image_2" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_2')">
-                                <img id="edit_content_preview_2" class="image-preview" alt="Preview 2">
-                            </div>
-
-                            <div class="form-group">
-                                <input type="file" name="edit_content_image_3" id="edit_content_image_3" class="form-control" accept="image/*" onchange="previewImage(this, 'edit_content_preview_3')">
-                                <img id="edit_content_preview_3" class="image-preview" alt="Preview 3">
-                            </div>
-                        </div>
-                    </div>
+                    <?php endif; ?>
 
                     <div class="form-group">
                         <label for="edit_status">Status</label>
@@ -697,92 +1001,6 @@ include '../includes/header.php';
     <input type="hidden" name="article_id" id="delete_article_id">
     <input type="hidden" name="delete_article" value="1">
 </form>
-
-<style>
-    .modal-backdrop {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 9999;
-        align-items: center;
-        justify-content: center;
-        overflow-y: auto;
-        padding: 1rem;
-    }
-
-    .modal-backdrop.show {
-        display: flex;
-    }
-
-    .modal-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-    }
-
-    /* Ensure buttons are always visible */
-    .btn {
-        min-height: 44px;
-        font-size: 1rem;
-        font-weight: 600;
-    }
-
-    .btn-primary {
-        background: var(--primary);
-        color: white;
-        border: none;
-    }
-
-    .btn-secondary {
-        background: var(--light);
-        color: var(--dark);
-        border: 1px solid var(--gray);
-    }
-
-    .btn-danger {
-        background: var(--danger);
-        color: white;
-        border: none;
-    }
-
-    .btn:hover {
-        opacity: 0.9;
-        transform: translateY(-1px);
-    }
-
-    .btn:active {
-        transform: translateY(0);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .modal-container {
-            align-items: flex-end;
-        }
-
-        .card {
-            width: 100%;
-            max-height: 90vh;
-            margin-bottom: 0;
-            border-radius: 12px 12px 0 0;
-        }
-
-        .action-buttons-container {
-            flex-direction: column;
-        }
-
-        .action-buttons-container .btn {
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-    }
-</style>
 
 <script>
     function previewImage(input, previewId) {
@@ -836,64 +1054,64 @@ include '../includes/header.php';
             featuredContainer.innerHTML = '<p style="color: var(--gray);">Tidak ada gambar utama.</p>';
         }
 
-        // Content Images
+        // Content Images (only if column exists)
         const contentContainer = document.getElementById('current_content_images_container');
-        contentContainer.innerHTML = '';
+        if (contentContainer) {
+            contentContainer.innerHTML = '';
 
-        // Safely parse content_images with multiple fallbacks
-        let contentImages = [];
-        try {
-            // Check if content_images exists and is not null/empty
-            if (article.content_images &&
-                article.content_images !== 'null' &&
-                article.content_images !== 'NULL' &&
-                article.content_images !== '' &&
-                article.content_images !== '[]' &&
-                article.content_images.trim() !== '') {
+            // Safely parse content_images
+            let contentImages = [];
+            try {
+                if (article.content_images &&
+                    article.content_images !== 'null' &&
+                    article.content_images !== 'NULL' &&
+                    article.content_images !== '' &&
+                    article.content_images !== '[]') {
 
-                const parsed = JSON.parse(article.content_images);
-                // Filter out any empty/null image paths
-                contentImages = Array.isArray(parsed) ? parsed.filter(img => img && img.trim() !== '') : [];
+                    const parsed = JSON.parse(article.content_images);
+                    contentImages = Array.isArray(parsed) ? parsed.filter(img => img && img.trim() !== '') : [];
+                }
+            } catch (e) {
+                console.warn('Could not parse content_images:', article.content_images);
+                contentImages = [];
             }
-        } catch (e) {
-            console.warn('Could not parse content_images:', article.content_images);
-            contentImages = [];
-        }
 
-        if (contentImages.length > 0) {
-            contentImages.forEach((imgPath, index) => {
-                const imgDiv = document.createElement('div');
-                imgDiv.classList.add('image-item');
+            if (contentImages.length > 0) {
+                contentImages.forEach((imgPath, index) => {
+                    const imgDiv = document.createElement('div');
+                    imgDiv.classList.add('image-item');
 
-                const img = document.createElement('img');
-                img.src = '../' + imgPath;
-                img.alt = 'Content Image ' + (index + 1);
+                    const img = document.createElement('img');
+                    img.src = '../' + imgPath;
+                    img.alt = 'Content Image ' + (index + 1);
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.type = 'button';
-                deleteBtn.classList.add('delete-image-btn');
-                deleteBtn.innerHTML = '&times;';
-                deleteBtn.onclick = function() {
-                    if (confirm('Yakin ingin menghapus gambar ini?')) {
-                        window.location.href = 'blog-management.php?delete_content_image=1&article_id=' + article.id + '&image_index=' + index;
-                    }
-                };
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.classList.add('delete-image-btn');
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.onclick = function() {
+                        if (confirm('Yakin ingin menghapus gambar ini?')) {
+                            window.location.href = 'blog-management.php?delete_content_image=1&article_id=' + article.id + '&image_index=' + index;
+                        }
+                    };
 
-                const label = document.createElement('div');
-                label.classList.add('image-label');
-                label.innerText = 'Gambar ' + (index + 1);
+                    const label = document.createElement('div');
+                    label.classList.add('image-label');
+                    label.innerText = 'Gambar ' + (index + 1);
 
-                imgDiv.appendChild(img);
-                imgDiv.appendChild(deleteBtn);
-                imgDiv.appendChild(label);
-                contentContainer.appendChild(imgDiv);
-            });
-        } else {
-            contentContainer.innerHTML = '<p style="color: var(--gray);">Tidak ada gambar dalam artikel.</p>';
+                    imgDiv.appendChild(img);
+                    imgDiv.appendChild(deleteBtn);
+                    imgDiv.appendChild(label);
+                    contentContainer.appendChild(imgDiv);
+                });
+            } else {
+                contentContainer.innerHTML = '<p style="color: var(--gray);">Tidak ada gambar dalam artikel.</p>';
+            }
         }
 
         // Show modal
         document.getElementById('editModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
 
         // Scroll to top of form
         setTimeout(() => {
@@ -906,6 +1124,7 @@ include '../includes/header.php';
 
     function closeEditModal() {
         document.getElementById('editModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
     }
 
     function confirmDeleteArticle() {
@@ -913,7 +1132,7 @@ include '../includes/header.php';
         const articleTitle = document.getElementById('edit_title').value;
 
         if (confirm('Apakah Anda yakin ingin menghapus artikel "' + articleTitle + '"? Tindakan ini tidak dapat dibatalkan!')) {
-            // Submit the hidden delete form
+            document.getElementById('delete_article_id').value = articleId;
             document.getElementById('deleteForm').submit();
         }
     }
@@ -934,5 +1153,9 @@ include '../includes/header.php';
 </script>
 
 <?php
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

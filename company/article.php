@@ -38,5 +38,7 @@ $conn = getDBConnection();
 </script>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 include __DIR__ . '/../includes/footer.php';

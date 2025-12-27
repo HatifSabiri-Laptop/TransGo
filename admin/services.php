@@ -19,16 +19,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price = floatval($_POST['price']);
         $capacity = intval($_POST['capacity']);
 
-        $stmt = $conn->prepare("INSERT INTO services (service_name, route, departure_date, departure_time, arrival_time, price, capacity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
-        $stmt->bind_param("sssssdi", $service_name, $route, $departure_date, $departure_time, $arrival_time, $price, $capacity);
-
-        if ($stmt->execute()) {
-            log_activity($conn, $_SESSION['user_id'], 'add_service', "Added service: $service_name");
-            $success = 'Layanan berhasil ditambahkan!';
+        // ✅ VALIDATE CAPACITY - MAX 20
+        if ($capacity > 20) {
+            $error = 'Kapasitas maksimal adalah 20 kursi!';
+        } elseif ($capacity < 1) {
+            $error = 'Kapasitas minimal adalah 1 kursi!';
         } else {
-            $error = 'Gagal menambahkan layanan!';
+            $stmt = $conn->prepare("INSERT INTO services (service_name, route, departure_date, departure_time, arrival_time, price, capacity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
+            $stmt->bind_param("sssssdi", $service_name, $route, $departure_date, $departure_time, $arrival_time, $price, $capacity);
+
+            if ($stmt->execute()) {
+                log_activity($conn, $_SESSION['user_id'], 'add_service', "Added service: $service_name");
+                $success = 'Layanan berhasil ditambahkan!';
+            } else {
+                $error = 'Gagal menambahkan layanan!';
+            }
+            $stmt->close();
         }
-        $stmt->close();
+        
     } elseif (isset($_POST['edit_service'])) {
         $service_id = intval($_POST['service_id']);
         $service_name = clean_input($_POST['service_name']);
@@ -40,16 +48,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $capacity = intval($_POST['capacity']);
         $status = clean_input($_POST['status']);
 
-        $stmt = $conn->prepare("UPDATE services SET service_name = ?, route = ?, departure_date = ?, departure_time = ?, arrival_time = ?, price = ?, capacity = ?, status = ? WHERE id = ?");
-        $stmt->bind_param("sssssdisi", $service_name, $route, $departure_date, $departure_time, $arrival_time, $price, $capacity, $status, $service_id);
-
-        if ($stmt->execute()) {
-            log_activity($conn, $_SESSION['user_id'], 'edit_service', "Edited service ID: $service_id");
-            $success = 'Layanan berhasil diupdate!';
+        // ✅ VALIDATE CAPACITY - MAX 20
+        if ($capacity > 20) {
+            $error = 'Kapasitas maksimal adalah 20 kursi!';
+        } elseif ($capacity < 1) {
+            $error = 'Kapasitas minimal adalah 1 kursi!';
         } else {
-            $error = 'Gagal mengupdate layanan!';
+            $stmt = $conn->prepare("UPDATE services SET service_name = ?, route = ?, departure_date = ?, departure_time = ?, arrival_time = ?, price = ?, capacity = ?, status = ? WHERE id = ?");
+            $stmt->bind_param("sssssdisi", $service_name, $route, $departure_date, $departure_time, $arrival_time, $price, $capacity, $status, $service_id);
+
+            if ($stmt->execute()) {
+                log_activity($conn, $_SESSION['user_id'], 'edit_service', "Edited service ID: $service_id");
+                $success = 'Layanan berhasil diupdate!';
+            } else {
+                $error = 'Gagal mengupdate layanan!';
+            }
+            $stmt->close();
         }
-        $stmt->close();
     } elseif (isset($_POST['delete_service'])) {
         $service_id = intval($_POST['service_id']);
 
@@ -77,281 +92,430 @@ include '../includes/header.php';
 ?>
 
 <style>
+    /* ✅ MOBILE NAVIGATION FIX - Added from index.php */
+    @media (max-width: 768px) {
+        .nav-menu {
+            left: -100%;
+            transition: left 0.3s;
+        }
+
+        .nav-menu.active {
+            left: 0 !important;
+        }
+
+        .nav-toggle {
+            display: flex !important;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns:3fr 1fr !important;
+        }
+    }
+
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .modal-backdrop.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        max-width: 680px;
+        width: 100%;
+        max-height: 95vh;
+        margin: auto;
+        overflow: hidden;
+        position: relative;
+    }
+.modal-body .form-group.time-departure {
+    flex: 2;
+}
+
+.modal-body .form-group.time-arrival {
+    flex: 1;
+}
+    .modal-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: white;
+        border: 2px solid var(--light);
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--gray);
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-close:hover {
+        background: var(--danger);
+        color: white;
+        transform: scale(1.1);
+        border-color: var(--danger);
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        max-height: 85vh;
+    }
+
+    @media (max-width: 768px) {
+        .modal-backdrop {
+            padding: 0.5rem;
+        }
+
+        .modal-close {
+            display: none;
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .modal-backdrop {
+            padding: 0.5rem;
+        }
+
+        .modal-body {
+            padding: 1rem;
+        }
+    }
+
+    .modal-close {
+        top: 8px;
+        right: 8px;
+        width: 34px;
+        height: 34px;
+        font-size: 1.2rem;
+    }
+
+    .modal-body {
+        padding: 2.70rem 0.95rem 1rem 1rem;
+        font-size: 4px;
+    }
+
+    .modal-body::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .modal-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .modal-body::-webkit-scrollbar-thumb {
+        background: var(--primary);
+        border-radius: 3px;
+    }
+
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+        display: block;
+    }
+
+    .table {
+        min-width: 1200px;
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th,
+    .table td {
+        vertical-align: middle !important;
+        padding: 0.75rem !important;
+    }
+
+    .desktop-table {
+        display: table;
+        width: 100%;
+    }
+
+    .mobile-cards {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .mobile-service-card {
+            background: white;
+            border: 1px solid var(--light);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .mobile-service-card .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--light);
+        }
+
+        .mobile-service-card .service-id {
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .mobile-service-card .service-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .mobile-service-card .service-main {
+            margin-bottom: 1rem;
+        }
+
+        .mobile-service-card .service-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+            color: var(--dark);
+        }
+
+        .mobile-service-card .service-route {
+            color: var(--gray);
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .mobile-service-card .service-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .mobile-service-card .service-detail-item {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9rem;
+        }
+
+        .mobile-service-card .detail-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-bottom: 0.25rem;
+        }
+
+        .mobile-service-card .detail-value {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .mobile-service-card .service-bookings {
+            background: #f8fafc;
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            text-align: center;
+        }
+
+        .mobile-service-card .booking-count {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--primary);
+        }
+
+        .mobile-service-card .booking-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .mobile-service-card .service-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--light);
+        }
+
+        .mobile-service-card .service-actions .btn {
+            padding: 0.4rem 0.8rem !important;
+            font-size: 0.9rem !important;
+            min-width: auto;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .desktop-table {
+            display: none;
+        }
+
+        .mobile-cards {
+            display: block;
+        }
+
+        .table-container {
+            overflow-x: visible;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .mobile-service-card .service-details {
+            grid-template-columns: 1fr;
+        }
+
+        .mobile-service-card .service-actions {
+            flex-direction: column;
+        }
+
+        .mobile-service-card .service-actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+/* ✅ RESPONSIVE FORM GRID FOR MOBILE */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
 @media (max-width: 768px) {
     .form-grid {
         grid-template-columns: 1fr !important;
-    }
-}
-
-.modal-backdrop {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    overflow-y: auto;
-    padding: 1rem;
-}
-
-.modal-backdrop.show {
-    display: flex;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    max-width: 650px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    margin: auto;
-}
-
-/* Table Responsive Styles */
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-    display: block;
-}
-
-.table {
-    min-width: 1200px;
-    width: 100%;
-    border-collapse: collapse;
-}
-
-/* Ensure table cells have proper alignment */
-.table th,
-.table td {
-    vertical-align: middle !important;
-    padding: 0.75rem !important;
-}
-
-/* Desktop and tablet table styles (always visible) */
-.desktop-table {
-    display: table;
-    width: 100%;
-}
-
-.mobile-cards {
-    display: none;
-}
-
-/* Mobile card styles (only for phones) */
-@media (max-width: 768px) {
-    .mobile-service-card {
-        background: white;
-        border: 1px solid var(--light);
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    .mobile-service-card .service-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 1px solid var(--light);
-    }
-    
-    .mobile-service-card .service-id {
-        font-weight: bold;
-        color: var(--primary);
-        font-size: 0.9rem;
-    }
-    
-    .mobile-service-card .service-status {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    
-    .mobile-service-card .service-main {
-        margin-bottom: 1rem;
-    }
-    
-    .mobile-service-card .service-name {
-        font-weight: bold;
-        font-size: 1.1rem;
-        margin-bottom: 0.25rem;
-        color: var(--dark);
-    }
-    
-    .mobile-service-card .service-route {
-        color: var(--gray);
-        font-size: 0.95rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    .mobile-service-card .service-details {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-        margin-bottom: 1rem;
-    }
-    
-    .mobile-service-card .service-detail-item {
-        display: flex;
-        flex-direction: column;
-        font-size: 0.9rem;
-    }
-    
-    .mobile-service-card .detail-label {
-        font-size: 0.8rem;
-        color: var(--gray);
-        margin-bottom: 0.25rem;
-    }
-    
-    .mobile-service-card .detail-value {
-        font-weight: 600;
-        color: var(--dark);
-    }
-    
-    .mobile-service-card .service-bookings {
-        background: #f8fafc;
-        padding: 0.75rem;
-        border-radius: 6px;
-        margin-bottom: 1rem;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
-        text-align: center;
-    }
-    
-    .mobile-service-card .booking-count {
-        font-weight: bold;
-        font-size: 1.2rem;
-        color: var(--primary);
-    }
-    
-    .mobile-service-card .booking-label {
-        font-size: 0.8rem;
-        color: var(--gray);
-    }
-    
-    .mobile-service-card .service-actions {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: flex-end;
-        padding-top: 0.75rem;
-        border-top: 1px solid var(--light);
-    }
-    
-    .mobile-service-card .service-actions .btn {
-        padding: 0.4rem 0.8rem !important;
-        font-size: 0.9rem !important;
-        min-width: auto;
-    }
-}
-
-/* Hide desktop table on mobile */
-@media (max-width: 768px) {
-    .desktop-table {
-        display: none;
-    }
-    
-    .mobile-cards {
-        display: block;
-    }
-    
-    .table-container {
-        overflow-x: visible;
+        gap: 1rem;
     }
 }
 
 @media (max-width: 480px) {
-    .mobile-service-card .service-details {
-        grid-template-columns: 1fr;
+    .form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem;
     }
     
-    .mobile-service-card .service-actions {
-        flex-direction: column;
+    .form-group {
+        margin-bottom: 0;
     }
     
-    .mobile-service-card .service-actions .btn {
-        width: 100%;
-        justify-content: center;
+    .form-group label {
+        font-size: 0.9rem;
+    }
+    
+    .form-group input,
+    .form-group select {
+        font-size: 0.95rem;
     }
 }
 
-/* Fix status badge alignment */
-.badge {
-    display: inline-block;
-    padding: 0.35rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: middle;
+/* ✅ FIX FOR SMALL SCREENS */
+@media (max-width: 380px) {
+    .form-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
+    .badge {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
 
-.badge-success {
-    background: #d1fae5;
-    color: #065f46;
-}
+    .badge-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
 
-.badge-danger {
-    background: #fee2e2;
-    color: #991b1b;
-}
+    .badge-danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 
-.status-active {
-    background: #d1fae5;
-    color: #065f46;
-}
+    .status-active {
+        background: #d1fae5;
+        color: #065f46;
+    }
 
-.status-inactive {
-    background: #fee2e2;
-    color: #991b1b;
-}
+    .status-inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 
-/* Ensure table actions are properly aligned */
-.table td:last-child {
-    white-space: nowrap;
-    text-align: center;
-}
+    .table td:last-child {
+        white-space: nowrap;
+        text-align: center;
+    }
 
-.table td:last-child form {
-    display: inline-block;
-}
+    .table td:last-child form {
+        display: inline-block;
+    }
 
-/* Make sure buttons in table are properly spaced */
-.table .btn {
-    margin: 2px;
-    padding: 0.4rem 0.8rem !important;
-}
+    .table .btn {
+        margin: 2px;
+        padding: 0.4rem 0.8rem !important;
+    }
 
-/* Add scrollbar styling */
-.table-container::-webkit-scrollbar {
-    height: 8px;
-}
+    .table-container::-webkit-scrollbar {
+        height: 8px;
+    }
 
-.table-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
+    .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
 
-.table-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
+    .table-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
 
-.table-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
+    .table-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* ✅ NEW: Capacity warning styles */
+    .capacity-warning {
+        color: #ef4444;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-top: 0.25rem;
+        display: none;
+    }
+
+    .capacity-warning.show {
+        display: block;
+    }
 </style>
 
 <section style="padding: 2rem 0; background: var(--light);">
@@ -376,7 +540,7 @@ include '../includes/header.php';
             <div class="card-header">
                 <h3 class="card-title">Tambah Layanan Baru</h3>
             </div>
-            <form method="POST" action="">
+            <form method="POST" action="" onsubmit="return validateCapacity('capacity')">
                 <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                     <div class="form-group">
                         <label for="service_name">Nama Layanan *</label>
@@ -392,8 +556,8 @@ include '../includes/header.php';
 
                     <div class="form-group">
                         <label for="departure_date">Tanggal Keberangkatan *</label>
-                        <input type="date" name="departure_date" id="departure_date" class="form-control" 
-                               min="<?php echo date('Y-m-d'); ?>" required>
+                        <input type="date" name="departure_date" id="departure_date" class="form-control"
+                            min="<?php echo date('Y-m-d'); ?>" required>
                     </div>
 
                     <div class="form-group">
@@ -415,7 +579,12 @@ include '../includes/header.php';
                     <div class="form-group">
                         <label for="capacity">Kapasitas *</label>
                         <input type="number" name="capacity" id="capacity" class="form-control"
-                            min="1" placeholder="20" value="20" required>
+                            min="1" max="20" placeholder="20" value="20" required
+                            oninput="checkCapacity(this)" onblur="checkCapacity(this)">
+                        <small style="color: var(--gray);">Maksimal 20 kursi</small>
+                        <div id="capacity_warning" class="capacity-warning">
+                            ⚠️ Kapasitas maksimal adalah 20 kursi!
+                        </div>
                     </div>
                 </div>
 
@@ -430,8 +599,8 @@ include '../includes/header.php';
             <div class="card-header">
                 <h3 class="card-title">Daftar Layanan</h3>
             </div>
-            
-            <!-- Desktop & Tablet Table (with horizontal scroll) -->
+
+            <!-- Desktop & Tablet Table -->
             <div class="table-container">
                 <table class="table desktop-table">
                     <thead>
@@ -462,7 +631,7 @@ include '../includes/header.php';
                                 <td style="white-space: nowrap;"><?php echo format_currency($service['price']); ?></td>
                                 <td><?php echo $service['capacity']; ?> kursi</td>
                                 <td>
-                                    <span class="badge badge-<?php echo $service['status'] === 'active' ? 'success' : 'danger'; ?>" style="vertical-align: middle;">
+                                    <span class="badge badge-<?php echo $service['status'] === 'active' ? 'success' : 'danger'; ?>">
                                         <?php echo $service['status'] === 'active' ? 'Active' : 'Inactive'; ?>
                                     </span>
                                 </td>
@@ -488,74 +657,73 @@ include '../includes/header.php';
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Mobile Cards (only for phones) -->
+
+            <!-- Mobile Cards -->
             <div class="mobile-cards" style="padding: 1rem;">
-                <?php 
-                // Reset pointer to iterate again
+                <?php
                 $services->data_seek(0);
-                while ($service = $services->fetch_assoc()): 
+                while ($service = $services->fetch_assoc()):
                 ?>
-                <div class="mobile-service-card">
-                    <div class="service-header">
-                        <div class="service-id">ID: <?php echo $service['id']; ?></div>
-                        <div class="service-status status-<?php echo $service['status']; ?>">
-                            <?php echo $service['status'] === 'active' ? 'Active' : 'Inactive'; ?>
+                    <div class="mobile-service-card">
+                        <div class="service-header">
+                            <div class="service-id">ID: <?php echo $service['id']; ?></div>
+                            <div class="service-status status-<?php echo $service['status']; ?>">
+                                <?php echo $service['status'] === 'active' ? 'Active' : 'Inactive'; ?>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="service-main">
-                        <div class="service-name"><?php echo $service['service_name']; ?></div>
-                        <div class="service-route"><?php echo $service['route']; ?></div>
-                    </div>
-                    
-                    <div class="service-details">
-                        <div class="service-detail-item">
-                            <span class="detail-label">Tanggal</span>
-                            <span class="detail-value"><?php echo format_date($service['departure_date'] ?? date('Y-m-d')); ?></span>
+
+                        <div class="service-main">
+                            <div class="service-name"><?php echo $service['service_name']; ?></div>
+                            <div class="service-route"><?php echo $service['route']; ?></div>
                         </div>
-                        <div class="service-detail-item">
-                            <span class="detail-label">Jadwal</span>
-                            <span class="detail-value">
-                                <?php echo date('H:i', strtotime($service['departure_time'])); ?> - 
-                                <?php echo date('H:i', strtotime($service['arrival_time'])); ?>
-                            </span>
+
+                        <div class="service-details">
+                            <div class="service-detail-item">
+                                <span class="detail-label">Tanggal</span>
+                                <span class="detail-value"><?php echo format_date($service['departure_date'] ?? date('Y-m-d')); ?></span>
+                            </div>
+                            <div class="service-detail-item">
+                                <span class="detail-label">Jadwal</span>
+                                <span class="detail-value">
+                                    <?php echo date('H:i', strtotime($service['departure_time'])); ?> -
+                                    <?php echo date('H:i', strtotime($service['arrival_time'])); ?>
+                                </span>
+                            </div>
+                            <div class="service-detail-item">
+                                <span class="detail-label">Harga</span>
+                                <span class="detail-value"><?php echo format_currency($service['price']); ?></span>
+                            </div>
+                            <div class="service-detail-item">
+                                <span class="detail-label">Kapasitas</span>
+                                <span class="detail-value"><?php echo $service['capacity']; ?> kursi</span>
+                            </div>
                         </div>
-                        <div class="service-detail-item">
-                            <span class="detail-label">Harga</span>
-                            <span class="detail-value"><?php echo format_currency($service['price']); ?></span>
+
+                        <div class="service-bookings">
+                            <div>
+                                <div class="booking-count"><?php echo $service['total_bookings']; ?></div>
+                                <div class="booking-label">Total Booking</div>
+                            </div>
+                            <div>
+                                <div class="booking-count"><?php echo $service['upcoming_bookings']; ?></div>
+                                <div class="booking-label">Mendatang</div>
+                            </div>
                         </div>
-                        <div class="service-detail-item">
-                            <span class="detail-label">Kapasitas</span>
-                            <span class="detail-value"><?php echo $service['capacity']; ?> kursi</span>
-                        </div>
-                    </div>
-                    
-                    <div class="service-bookings">
-                        <div>
-                            <div class="booking-count"><?php echo $service['total_bookings']; ?></div>
-                            <div class="booking-label">Total Booking</div>
-                        </div>
-                        <div>
-                            <div class="booking-count"><?php echo $service['upcoming_bookings']; ?></div>
-                            <div class="booking-label">Mendatang</div>
-                        </div>
-                    </div>
-                    
-                    <div class="service-actions">
-                        <button onclick="editService(<?php echo htmlspecialchars(json_encode($service)); ?>)"
+
+                        <div class="service-actions">
+                            <button onclick="editService(<?php echo htmlspecialchars(json_encode($service)); ?>)"
                                 class="btn btn-secondary">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <form method="POST" action="" style="display: inline;">
-                            <input type="hidden" name="service_id" value="<?php echo $service['id']; ?>">
-                            <button type="submit" name="delete_service" class="btn btn-danger" 
-                                    onclick="return confirm('Yakin ingin menghapus layanan ini?')">
-                                <i class="fas fa-trash"></i> Hapus
+                                <i class="fas fa-edit"></i> Edit
                             </button>
-                        </form>
+                            <form method="POST" action="" style="display: inline;">
+                                <input type="hidden" name="service_id" value="<?php echo $service['id']; ?>">
+                                <button type="submit" name="delete_service" class="btn btn-danger"
+                                    onclick="return confirm('Yakin ingin menghapus layanan ini?')">
+                                    <i class="fas fa-trash"></i> Hapus
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
                 <?php endwhile; ?>
             </div>
         </div>
@@ -565,108 +733,127 @@ include '../includes/header.php';
 <!-- Edit Modal -->
 <div id="editModal" class="modal-backdrop">
     <div class="modal-content">
-        <div class="card-header" style="position: sticky;margin: 1rem 1rem; z-index: 10; background: white; border-radius: 12px 12px 0 0;">
-            <h3 class="card-title">Edit Layanan</h3>
+        <div class="modal-body">
+            <form method="POST" action="" id="editForm" onsubmit="return validateCapacity('edit_capacity')">
+                <input type="hidden" name="service_id" id="edit_service_id">
+
+                <div class="form-group">
+                    <label for="edit_service_name">Nama Layanan *</label>
+                    <input type="text" name="service_name" id="edit_service_name" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_route">Rute *</label>
+                    <input type="text" name="route" id="edit_route" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_departure_date">Tanggal Keberangkatan *</label>
+                    <input type="date" name="departure_date" id="edit_departure_date" class="form-control" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 0.95fr 0.95fr; gap: 0.95rem;">
+                    <div class="form-group">
+                        <label for="edit_departure_time">Jam Berangkat *</label>
+                        <input type="time" name="departure_time" id="edit_departure_time" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit_arrival_time">Jam Tiba *</label>
+                        <input type="time" name="arrival_time" id="edit_arrival_time" class="form-control" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="edit_price">Harga (Rp) *</label>
+                        <input type="number" name="price" id="edit_price" class="form-control" min="0" step="1000" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit_capacity">Kapasitas *</label>
+                        <input type="number" name="capacity" id="edit_capacity" class="form-control"
+                            min="1" max="20" required
+                            oninput="checkCapacity(this)" onblur="checkCapacity(this)">
+                        <small style="color: var(--gray);">Maksimal 20 kursi</small>
+                        <div id="edit_capacity_warning" class="capacity-warning">
+                            ⚠️ Kapasitas maksimal adalah 20 kursi!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_status">Status *</label>
+                    <select name="status" id="edit_status" class="form-control" required>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 1rem; padding-top: 1rem; border-top: 2px solid var(--light); margin-top: 1rem;">
+                    <button type="submit" name="edit_service" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-save"></i> Simpan Perubahan
+                    </button>
+                    <button type="button" onclick="closeModal()" class="btn btn-danger" style="flex: 1;">
+                        <i class="fas fa-times"></i> Batal
+                    </button>
+                </div>
+            </form>
         </div>
-        <form method="POST" action="" id="editForm" style="padding: 1.5rem;">
-            <input type="hidden" name="service_id" id="edit_service_id">
-
-            <div class="form-group">
-                <label for="edit_service_name">Nama Layanan *</label>
-                <input type="text" name="service_name" id="edit_service_name" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-                <label for="edit_route">Rute *</label>
-                <input type="text" name="route" id="edit_route" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-                <label for="edit_departure_date">Tanggal Keberangkatan *</label>
-                <input type="date" name="departure_date" id="edit_departure_date" class="form-control" required>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label for="edit_departure_time">Jam Berangkat *</label>
-                    <input type="time" name="departure_time" id="edit_departure_time" class="form-control" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit_arrival_time">Jam Tiba *</label>
-                    <input type="time" name="arrival_time" id="edit_arrival_time" class="form-control" required>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label for="edit_price">Harga (Rp) *</label>
-                    <input type="number" name="price" id="edit_price" class="form-control" min="0" step="1000" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit_capacity">Kapasitas *</label>
-                    <input type="number" name="capacity" id="edit_capacity" class="form-control" min="1" required>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="edit_status">Status *</label>
-                <select name="status" id="edit_status" class="form-control" required>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                </select>
-            </div>
-
-            <div style="display: flex; gap: 1rem; padding-top: 1rem; border-top: 2px solid var(--light); margin-top: 1rem;">
-                <button type="submit" name="edit_service" class="btn btn-primary" style="flex: 1;">
-                    <i class="fas fa-save"></i> Simpan Perubahan
-                </button>
-                <button type="button" onclick="closeModal()" class="btn btn-danger" style="flex: 1;">
-                    <i class="fas fa-times"></i> Batal
-                </button>
-            </div>
-        </form>
     </div>
 </div>
 
 <script>
-function editService(service) {
-    document.getElementById('edit_service_id').value = service.id;
-    document.getElementById('edit_service_name').value = service.service_name;
-    document.getElementById('edit_route').value = service.route;
-    document.getElementById('edit_departure_date').value = service.departure_date || '<?php echo date('Y-m-d'); ?>';
-    document.getElementById('edit_departure_time').value = service.departure_time;
-    document.getElementById('edit_arrival_time').value = service.arrival_time;
-    document.getElementById('edit_price').value = service.price;
-    document.getElementById('edit_capacity').value = service.capacity;
-    document.getElementById('edit_status').value = service.status;
-    
-    document.getElementById('editModal').classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
+    // ✅ Validate capacity input in real-time
+    function checkCapacity(input) {
+        const value = parseInt(input.value);
+        const warningId = input.id + '_warning';
+        const warning = document.getElementById(warningId);
 
-function closeModal() {
-    document.getElementById('editModal').classList.remove('show');
-    document.body.style.overflow = 'auto';
-}
-
-// Close modal when clicking outside
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeModal();
+        if (value > 20) {
+            input.value = 20;
+            if (warning) {
+                warning.classList.add('show');
+                setTimeout(() => warning.classList.remove
+('show'), 3000);
+            }
+        } else if (value < 1) {
+            input.value = 1;
+        } else {
+            if (warning) {
+                warning.classList.remove('show');
+            }
+        }
     }
-});
 
-// Close modal with Escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeModal();
+    function validateCapacity(inputId) {
+        const input = document.getElementById(inputId);
+        const value = parseInt(input.value);
+        if (value > 20) {
+            alert('Kapasitas maksimal adalah 20 kursi!');
+            input.focus();
+            return false;
+        }
+        return true;
     }
-});
+
+    function editService(service) {
+        document.getElementById('edit_service_id').value = service.id;
+        document.getElementById('edit_service_name').value = service.service_name;
+        document.getElementById('edit_route').value = service.route;
+        document.getElementById('edit_departure_date').value = service.departure_date;
+        document.getElementById('edit_departure_time').value = service.departure_time;
+        document.getElementById('edit_arrival_time').value = service.arrival_time;
+        document.getElementById('edit_price').value = service.price;
+        document.getElementById('edit_capacity').value = service.capacity;
+        document.getElementById('edit_status').value = service.status;
+        document.getElementById('editModal').classList.add('show');
+    }
+    function closeModal() {
+        document.getElementById('editModal').classList.remove('show');
+    }
 </script>
-
 <?php
-closeDBConnection($conn);
 include '../includes/footer.php';
+$conn->close();
 ?>

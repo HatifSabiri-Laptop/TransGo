@@ -371,6 +371,9 @@ function deleteExperience(id) {
 </script>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

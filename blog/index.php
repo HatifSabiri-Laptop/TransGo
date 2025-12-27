@@ -197,6 +197,8 @@ include '../includes/header.php';
 </section>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 include '../includes/footer.php';
 ?>

@@ -61,9 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute();
                     $stmt->close();
                 }
-                closeDBConnection($conn);
             }
-
         } catch (Exception $e) {
             $contact_error = "Gagal mengirim email: " . $mail->ErrorInfo;
         }
@@ -86,21 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST" class="card p-4" data-aos="zoom-in">
             <div class="form-group" style="margin-bottom:1rem;">
                 <label>Name</label>
-                <input type="text" name="name" class="form-control" 
-                       value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" required>
+                <input type="text" name="name" class="form-control"
+                    value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" required>
             </div>
 
             <div class="form-group" style="margin-bottom:1rem;">
                 <label>Email</label>
-                <input type="email" name="email" class="form-control" 
-                       value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
+                <input type="email" name="email" class="form-control"
+                    value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
             </div>
 
             <div class="form-group" style="margin-bottom:1rem;">
                 <label>Message</label>
-                <textarea name="message" class="form-control" rows="6" required><?php 
-                    echo isset($_POST['message']) ? htmlspecialchars($_POST['message']) : ''; 
-                ?></textarea>
+                <textarea name="message" class="form-control" rows="6" required><?php
+                                                                                echo isset($_POST['message']) ? htmlspecialchars($_POST['message']) : '';
+                                                                                ?></textarea>
             </div>
 
             <button class="btn btn-primary" type="submit">Send Message</button>
@@ -110,9 +108,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script>
-AOS.init({ duration: 800, once: true });
+    AOS.init({
+        duration: 800,
+        once: true
+    });
 </script>
 
 <?php
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
 include __DIR__ . '/../includes/footer.php';
 ?>

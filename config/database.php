@@ -1,26 +1,17 @@
 <?php
-// Database configuration
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'transportation_app');
-
-// Create connection
 function getDBConnection() {
-    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-    
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-    
-    $conn->set_charset("utf8mb4");
-    return $conn;
-}
+    $host = "localhost";
+    $user = "root";
+    $pass = "";
+    $db   = "transportation_app";
 
-// Close connection
-function closeDBConnection($conn) {
-    if ($conn) {
-        $conn->close();
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+    try {
+        $conn = new mysqli($host, $user, $pass, $db);
+        $conn->set_charset("utf8mb4");
+        return $conn;
+    } catch (mysqli_sql_exception $e) {
+        die("Database connection failed: " . $e->getMessage());
     }
 }
-?>

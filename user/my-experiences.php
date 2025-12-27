@@ -305,6 +305,9 @@ function deleteMedia(id) {
 </script>
 
 <?php
-closeDBConnection($conn);
+if ($conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>

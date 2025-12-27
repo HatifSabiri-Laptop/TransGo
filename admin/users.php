@@ -61,12 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user_id === $_SESSION['user_id']) {
             $error = 'Tidak dapat menghapus akun sendiri!';
         } else {
+            // ✅ Mark user as deleted by setting a session flag
+            // Store deleted user ID in a file or database flag
+            $deleted_users_file = '../config/deleted_users.txt';
+            file_put_contents($deleted_users_file, $user_id . PHP_EOL, FILE_APPEND);
+            
             $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
             $stmt->bind_param("i", $user_id);
             
             if ($stmt->execute()) {
                 log_activity($conn, $_SESSION['user_id'], 'delete_user', "Deleted user ID: $user_id");
-                $success = 'User berhasil dihapus!';
+                $success = 'User berhasil dihapus! User akan otomatis logout.';
             } else {
                 $error = 'Gagal menghapus user!';
             }
@@ -390,7 +395,7 @@ include '../includes/header.php';
                                 </button>
                                 <?php if ($user['id'] !== $_SESSION['user_id']): ?>
                                 <form method="POST" action="" style="display: inline;" 
-                                      onsubmit="return confirm('Yakin ingin menghapus user ini?')">
+                                      onsubmit="return confirm('Yakin ingin menghapus user ini? User akan otomatis logout.')">
                                     <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                     <button type="submit" name="delete_user" class="btn btn-danger" style="padding: 0.5rem 1rem;">
                                         <i class="fas fa-trash"></i>
@@ -447,7 +452,7 @@ include '../includes/header.php';
                         <form method="POST" action="" style="display: inline;">
                             <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                             <button type="submit" name="delete_user" class="btn btn-danger" 
-                                    onclick="return confirm('Yakin ingin menghapus user ini?')">
+                                    onclick="return confirm('Yakin ingin menghapus user ini? User akan otomatis logout.')">
                                 <i class="fas fa-trash"></i> Hapus
                             </button>
                         </form>
@@ -538,6 +543,9 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <?php
-closeDBConnection($conn);
+if (isset($conn) && $conn instanceof mysqli) {
+    $conn->close();
+}
+
 include '../includes/footer.php';
 ?>
