@@ -277,7 +277,7 @@ include '../includes/header.php';
     }
 
     .card-header {
-        background: linear-gradient(135deg, #64a07fb0 0%, #75d370ff 100%);
+        background: linear-gradient(135deg, #145dbddd 0%, #6694cdb3 100%);
         color: white;
         padding: 1.5rem;
         border-radius: 12px 12px 0 0;
@@ -516,7 +516,7 @@ include '../includes/header.php';
     }
 
     .table thead tr {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        background: linear-gradient(135deg, #3176bcff 0%, #4aa4ffff 100%);
     }
 
     .table thead th {

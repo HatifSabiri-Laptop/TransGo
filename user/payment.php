@@ -820,7 +820,7 @@ if (isset($_SESSION['payment_error'])) {
         }
 
         .payment-logo strong {
-            font-size: 0.6rem !important;
+            font-size: 0.5rem !important;
         }
 
         .payment-card {
@@ -849,7 +849,7 @@ if (isset($_SESSION['payment_error'])) {
     /* Desktop - ensure payment logos look good */
     @media (min-width: 769px) {
         .payment-logo strong {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             white-space: nowrap;
         }
     }
@@ -1119,14 +1119,14 @@ if (isset($_SESSION['payment_error'])) {
 
                                 <!-- Alfamart -->
                                 <label class="payment-option">
-                                    <input type="radio" name="payment_method_radio" value="Alfamart" required>
+                                    <input type="radio" name="payment_method_radio" value="GoTrans" required>
                                     <div class="payment-card">
                                         <div class="payment-logo" style="background: #ed1c24;">
-                                            <strong style="color: white; font-size: 0.7rem;">ALFAMART</strong>
+                                            <strong style="color: white; font-size: 0.7rem;">Alfamart</strong>
                                         </div>
                                         <div class="payment-info">
                                             <strong class="truncate-text">Alfamart</strong>
-                                            <small class="truncate-text">Bayar di kasir Alfamart</small>
+                                            <small class="truncate-text">Bayar di kasir Alfamart yang paking dekat </small>
                                         </div>
                                         <i class="fas fa-check-circle payment-check"></i>
                                     </div>

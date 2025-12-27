@@ -31,7 +31,7 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
 <style>
     /* inline styles in index.php */
     .hero {
-        background: linear-gradient(135deg, rgba(150, 235, 210, 0.95), rgba(102, 226, 185, 0.95)),
+        background: linear-gradient(135deg, rgba(150, 235, 210, 0.73), rgba(102, 226, 185, 0.64)),
             url('assets/images/hero-bus.jpg') center/cover !important;
         display: flex !important;
         align-items: center !important;
@@ -89,7 +89,7 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
                     <i class="fas fa-ticket-alt"></i> Admin Dashboard
                 </a>
                   <a href="<?php echo SITE_URL; ?>/admin/cancellations.php"
-                    class="btn btn-outline btn-lg">
+                    class="btn btn-primary btn-lg">
                     <i class="fas fa-times-circle"></i> Kelola Pembatalan
                 </a>
             <?php else: ?>
@@ -191,6 +191,48 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
     </div>
 </section>
 
+<!-- Luxury Carousel Section -->
+<section class="luxury-carousel-section">
+    <div class="carousel-container">
+        <div class="carousel-slide active">
+            <img src="<?php echo SITE_URL; ?>/assets/images/luxury1-new.jpg" alt="Luxury Transport 1">
+            <div class="carousel-overlay">
+                <h3>Bersihin Kelas Atas</h3>
+                <p>Armada yang bersih dan nyaman</p>
+            </div>
+        </div>
+        <div class="carousel-slide">
+            <img src="<?php echo SITE_URL; ?>/assets/images/luxury2-new.jpg" alt="Luxury Transport 2">
+            <div class="carousel-overlay">
+                <h3>Interior Mewah</h3>
+                <p>Desain interior yang elegan dan modern</p>
+            </div>
+        </div>
+        <div class="carousel-slide">
+            <img src="<?php echo SITE_URL; ?>/assets/images/luxury3-new.jpg" alt="Luxury Transport 3">
+            <div class="carousel-overlay">
+                <h3>Teknologi Terkini</h3>
+                <p>Dilengkapi dengan teknologi dan entertainment terbaru</p>
+            </div>
+        </div>
+         <div class="carousel-slide">
+            <img src="<?php echo SITE_URL; ?>/assets/images/luxury4.jpg" alt="Luxury Transport 4">
+            <div class="carousel-overlay">
+                <h4>Best Experience</h4>
+                <p>Dapatkan pengalaman penumpang yang memuaskan</p>
+            </div>
+        </div>
+        
+        <!-- Navigation Dots -->
+        <div class="carousel-dots">
+            <span class="dot active" data-slide="0"></span>
+            <span class="dot" data-slide="1"></span>
+            <span class="dot" data-slide="2"></span>
+            <span class="dot" data-slide="3"></span>
+        </div>
+    </div>
+</section>
+
 <!-- How to Book Section -->
 <section class="how-to-book">
     <div class="container">
@@ -273,12 +315,61 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
             </a>
             <a href="https://mail.google.com/mail/?view=cm&fs=1&to=hatifsabiri648@gmail.com&su=Hello&body=I%20want%20to%20contact%20you"
                 target="_blank"
-                class="btn btn-outline">
+                class="btn btn-primary">
                 <i class="fas fa-envelope"></i> Email Kami
             </a>
         </div>
     </div>
 </section>
+
+<script>
+// Carousel functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const slides = document.querySelectorAll('.carousel-slide');
+    const dots = document.querySelectorAll('.carousel-dots .dot');
+    let currentSlide = 0;
+    const slideInterval = 3000; // 3 seconds
+
+    function showSlide(index) {
+        // Remove active class from all slides and dots
+        slides.forEach(slide => slide.classList.remove('active'));
+        dots.forEach(dot => dot.classList.remove('active'));
+        
+        // Add active class to current slide and dot
+        slides[index].classList.add('active');
+        dots[index].classList.add('active');
+    }
+
+    function nextSlide() {
+        currentSlide = (currentSlide + 1) % slides.length;
+        showSlide(currentSlide);
+    }
+
+    // Auto advance slides
+    let autoSlide = setInterval(nextSlide, slideInterval);
+
+    // Manual dot navigation
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+            currentSlide = index;
+            showSlide(currentSlide);
+            // Reset auto advance
+            clearInterval(autoSlide);
+            autoSlide = setInterval(nextSlide, slideInterval);
+        });
+    });
+
+    // Pause on hover
+    const carouselContainer = document.querySelector('.carousel-container');
+    carouselContainer.addEventListener('mouseenter', () => {
+        clearInterval(autoSlide);
+    });
+    
+    carouselContainer.addEventListener('mouseleave', () => {
+        autoSlide = setInterval(nextSlide, slideInterval);
+    });
+});
+</script>
 
 <?php
 if (isset($conn) && $conn instanceof mysqli) {

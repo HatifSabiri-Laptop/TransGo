@@ -65,6 +65,7 @@ include '../includes/header.php';
             opacity: 0;
             transform: translateY(-5px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -93,22 +94,22 @@ include '../includes/header.php';
         }
 
         /* Mobile ticket card header adjustments */
-        .ticket-card > div:first-child {
+        .ticket-card>div:first-child {
             padding-bottom: 1rem !important;
         }
-        
-        .ticket-card > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
-            font-size: 1.05rem !important; 
-            letter-spacing: 0.5px !important; 
+
+        .ticket-card>div:first-child>div:first-child>div:first-child>div:nth-child(2) {
+            font-size: 1.05rem !important;
+            letter-spacing: 0.5px !important;
             word-break: break-all;
         }
 
-        .ticket-card > div:first-child > div:first-child {
+        .ticket-card>div:first-child>div:first-child {
             flex-direction: column !important;
             align-items: flex-start !important;
         }
 
-        .ticket-card > div:first-child > div:first-child > div:first-child {
+        .ticket-card>div:first-child>div:first-child>div:first-child {
             margin-bottom: 0.75rem;
             width: 100%;
         }
@@ -121,10 +122,16 @@ include '../includes/header.php';
             width: 100%;
         }
 
-        .ticket-card > div:first-child > div:first-child > .status-badges-container {
+        .ticket-card>div:first-child>div:first-child>.status-badges-container {
             position: static !important;
             margin-top: 0 !important;
             align-self: flex-start;
+        }
+
+        /* Move check-in badge into header on mobile */
+        .ticket-card>div:first-child>div:last-child {
+            position: static !important;
+            margin-top: 0.5rem;
         }
     }
 
@@ -133,7 +140,7 @@ include '../includes/header.php';
             padding: 0.75rem !important;
         }
 
-        .ticket-card > div:first-child > div:first-child > div:first-child > div:nth-child(2) {
+        .ticket-card>div:first-child>div:first-child>div:first-child>div:nth-child(2) {
             font-size: 0.95rem !important;
             letter-spacing: 0.3px !important;
             word-break: break-all;
@@ -168,7 +175,7 @@ include '../includes/header.php';
                         $is_upcoming = strtotime($ticket['travel_date']) >= strtotime(date('Y-m-d'));
                         $is_past = strtotime($ticket['travel_date']) < strtotime(date('Y-m-d'));
                         $is_cancelled = $ticket['booking_status'] === 'cancelled';
-                        
+
                         // Calculate refund status
                         $refund_status = 'none';
                         $cancel_timestamp = null;
@@ -176,7 +183,7 @@ include '../includes/header.php';
                             $cancel_timestamp = strtotime($ticket['cancel_processed_at']);
                             $current_timestamp = time();
                             $time_diff_minutes = ($current_timestamp - $cancel_timestamp) / 60;
-                            
+
                             if ($time_diff_minutes >= 2) {
                                 $refund_status = 'completed';
                             } else {
@@ -184,12 +191,12 @@ include '../includes/header.php';
                             }
                         }
                     ?>
-                        <div class="ticket-card" 
-                             style="border: 2px solid <?php echo $is_cancelled ? '#dc2626' : ($is_upcoming ? 'var(--primary)' : 'var(--gray)'); ?>; border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); <?php echo $is_cancelled ? 'opacity: 0.85;' : ''; ?>"
-                             data-cancelled="<?php echo $is_cancelled ? '1' : '0'; ?>"
-                             data-cancel-timestamp="<?php echo $cancel_timestamp ?? ''; ?>"
-                             data-refund-status="<?php echo $refund_status; ?>">
-                            
+                        <div class="ticket-card"
+                            style="border: 2px solid <?php echo $is_cancelled ? '#dc2626' : ($is_upcoming ? 'var(--primary)' : 'var(--gray)'); ?>; border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); <?php echo $is_cancelled ? 'opacity: 0.85;' : ''; ?>"
+                            data-cancelled="<?php echo $is_cancelled ? '1' : '0'; ?>"
+                            data-cancel-timestamp="<?php echo $cancel_timestamp ?? ''; ?>"
+                            data-refund-status="<?php echo $refund_status; ?>">
+
                             <!-- Ticket Header -->
                             <div style="background: <?php echo $is_cancelled ? '#dc2626' : ($is_upcoming ? 'linear-gradient(135deg, var(--primary), #1d4ed8)' : 'var(--gray)'); ?>; color: white; padding: 1rem; position: relative;">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
@@ -199,13 +206,13 @@ include '../includes/header.php';
                                             <?php echo $ticket['booking_code']; ?>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Status Badges Container -->
                                     <div class="status-badges-container">
                                         <!-- Refund Status Badge -->
                                         <?php if ($is_cancelled && $refund_status !== 'none'): ?>
-                                            <span class="refund-badge refund-<?php echo $refund_status; ?>" 
-                                                  id="refund-badge-<?php echo $ticket['id']; ?>">
+                                            <span class="refund-badge refund-<?php echo $refund_status; ?>"
+                                                id="refund-badge-<?php echo $ticket['id']; ?>">
                                                 <?php if ($refund_status === 'processing'): ?>
                                                     <i class="fas fa-spinner fa-spin"></i> Refund Processing
                                                 <?php else: ?>
@@ -213,7 +220,7 @@ include '../includes/header.php';
                                                 <?php endif; ?>
                                             </span>
                                         <?php endif; ?>
-                                        
+
                                         <!-- Cancelled/Upcoming/Past Badge -->
                                         <?php if ($is_cancelled): ?>
                                             <span style="background: rgba(255,255,255,0.95); color: #dc2626; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
@@ -354,30 +361,30 @@ include '../includes/header.php';
     // Refund status update function
     function updateRefundStatus() {
         const ticketCards = document.querySelectorAll('.ticket-card[data-cancelled="1"]');
-        
+
         ticketCards.forEach(card => {
             const cancelTimestamp = parseInt(card.getAttribute('data-cancel-timestamp'));
             const currentRefundStatus = card.getAttribute('data-refund-status');
-            
+
             if (cancelTimestamp && currentRefundStatus === 'processing') {
                 const currentTime = Math.floor(Date.now() / 1000);
                 const timeDiffMinutes = (currentTime - cancelTimestamp) / 60;
-                
+
                 // Check if 2 minutes have passed
                 if (timeDiffMinutes >= 2) {
                     const refundBadge = card.querySelector('[id^="refund-badge-"]');
                     const refundMessage = card.querySelector('[id^="refund-message-"]');
-                    
+
                     if (refundBadge) {
                         // Update badge
                         refundBadge.classList.remove('refund-processing');
                         refundBadge.classList.add('refund-completed');
                         refundBadge.innerHTML = '<i class="fas fa-check-circle"></i> Refunded';
-                        
+
                         // Update card attribute
                         card.setAttribute('data-refund-status', 'completed');
                     }
-                    
+
                     if (refundMessage) {
                         // Update message
                         refundMessage.textContent = 'Pembatalan diproses dan dana telah dikembalikan';

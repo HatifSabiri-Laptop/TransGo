@@ -99,16 +99,55 @@ include '../includes/header.php';
         font-weight: 600;
     }
 
-    .action-login { background: #d1fae5; color: #065f46; }
-    .action-logout { background: #fee2e2; color: #991b1b; }
-    .action-create_reservation { background: #dbeafe; color: #1e40af; }
-    .action-create { background: #d1fae5; color: #065f46; }
-    .action-failed_login { background: #fee2e2; color: #991b1b; }
-    .action-delete { background: #fecaca; color: #7f1d1d; }
-    .action-update { background: #fef3c7; color: #92400e; }
-    .action-register { background: #dbeafe; color: #1e40af; }
-    .action-payment { background: #d1fae5; color: #065f46; }
-    .action-test { background: #e5e7eb; color: #374151; }
+    .action-login {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .action-logout {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .action-create_reservation {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .action-create {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .action-failed_login {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .action-delete {
+        background: #fecaca;
+        color: #7f1d1d;
+    }
+
+    .action-update {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .action-register {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .action-payment {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .action-test {
+        background: #e5e7eb;
+        color: #374151;
+    }
 
     .stats-mini {
         display: grid;
@@ -534,14 +573,14 @@ include '../includes/header.php';
                                             </div>
                                         </div>
                                         <?php if (!empty($log['user_agent'])): ?>
-                                        <div class="mobile-detail-item">
-                                            <div class="mobile-detail-label">
-                                                <i class="fas fa-desktop"></i> User Agent:
+                                            <div class="mobile-detail-item">
+                                                <div class="mobile-detail-label">
+                                                    <i class="fas fa-desktop"></i> User Agent:
+                                                </div>
+                                                <div class="mobile-detail-value" style="font-size: 0.8rem; color: var(--gray);">
+                                                    <?php echo htmlspecialchars(substr($log['user_agent'], 0, 50)) . '...'; ?>
+                                                </div>
                                             </div>
-                                            <div class="mobile-detail-value" style="font-size: 0.8rem; color: var(--gray);">
-                                                <?php echo htmlspecialchars(substr($log['user_agent'], 0, 50)) . '...'; ?>
-                                            </div>
-                                        </div>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -556,27 +595,27 @@ include '../includes/header.php';
 </section>
 
 <script>
-function toggleDetails(index) {
-    const detailRow = document.getElementById('detail-' + index);
-    const button = event.currentTarget;
-    
-    if (detailRow.classList.contains('show')) {
-        detailRow.classList.remove('show');
-        button.classList.remove('active');
-    } else {
-        // Close all other details
-        document.querySelectorAll('.mobile-detail-row').forEach(row => {
-            row.classList.remove('show');
-        });
-        document.querySelectorAll('.mobile-detail-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        // Open this detail
-        detailRow.classList.add('show');
-        button.classList.add('active');
+    function toggleDetails(index) {
+        const detailRow = document.getElementById('detail-' + index);
+        const button = event.currentTarget;
+
+        if (detailRow.classList.contains('show')) {
+            detailRow.classList.remove('show');
+            button.classList.remove('active');
+        } else {
+            // Close all other details
+            document.querySelectorAll('.mobile-detail-row').forEach(row => {
+                row.classList.remove('show');
+            });
+            document.querySelectorAll('.mobile-detail-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Open this detail
+            detailRow.classList.add('show');
+            button.classList.add('active');
+        }
     }
-}
 </script>
 
 <?php
