@@ -91,7 +91,7 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
                     class="btn btn-primary btn-lg">
                     <i class="fas fa-ticket-alt"></i> Admin Dashboard
                 </a>
-                  <a href="<?php echo SITE_URL; ?>/admin/cancellations.php"
+                <a href="<?php echo SITE_URL; ?>/admin/cancellations.php"
                     class="btn btn-primary btn-lg">
                     <i class="fas fa-times-circle"></i> Kelola Pembatalan
                 </a>
@@ -218,14 +218,14 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
                 <p>Dilengkapi dengan teknologi dan entertainment terbaru</p>
             </div>
         </div>
-         <div class="carousel-slide">
+        <div class="carousel-slide">
             <img src="<?php echo SITE_URL; ?>/assets/images/luxury4.jpg" alt="Luxury Transport 4">
             <div class="carousel-overlay">
                 <h4>Best Experience</h4>
                 <p>Dapatkan pengalaman penumpang yang memuaskan</p>
             </div>
         </div>
-        
+
         <!-- Navigation Dots -->
         <div class="carousel-dots">
             <span class="dot active" data-slide="0"></span>
@@ -326,112 +326,112 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
 </section>
 
 <script>
-// Snowfall Effect
-const canvas = document.getElementById('snow');
-const ctx = canvas.getContext('2d');
+    // Snowfall Effect
+    const canvas = document.getElementById('snow');
+    const ctx = canvas.getContext('2d');
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-
-let snowflakes = [];
-
-// Initialize snowflakes
-for (let i = 0; i < 150; i++) {
-    snowflakes.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 4 + 1,
-        d: Math.random() * 1
-    });
-}
-
-function drawSnow() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-
-    for (let i = 0; i < snowflakes.length; i++) {
-        let f = snowflakes[i];
-        ctx.moveTo(f.x, f.y);
-        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2, true);
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
     }
-    ctx.fill();
-    moveSnow();
-}
 
-let angle = 0;
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
-function moveSnow() {
-    angle += 0.01;
-    for (let i = 0; i < snowflakes.length; i++) {
-        let f = snowflakes[i];
-        f.y += Math.cos(angle + f.d) + 1 + f.r / 2;
-        f.x += Math.sin(angle) * 2;
+    let snowflakes = [];
 
-        if (f.y > canvas.height) {
-            snowflakes[i] = {
-                x: Math.random() * canvas.width,
-                y: 0,
-                r: f.r,
-                d: f.d
-            };
+    // Initialize snowflakes
+    for (let i = 0; i < 150; i++) {
+        snowflakes.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 4 + 1,
+            d: Math.random() * 1
+        });
+    }
+
+    function drawSnow() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+
+        for (let i = 0; i < snowflakes.length; i++) {
+            let f = snowflakes[i];
+            ctx.moveTo(f.x, f.y);
+            ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2, true);
+        }
+        ctx.fill();
+        moveSnow();
+    }
+
+    let angle = 0;
+
+    function moveSnow() {
+        angle += 0.01;
+        for (let i = 0; i < snowflakes.length; i++) {
+            let f = snowflakes[i];
+            f.y += Math.cos(angle + f.d) + 1 + f.r / 2;
+            f.x += Math.sin(angle) * 2;
+
+            if (f.y > canvas.height) {
+                snowflakes[i] = {
+                    x: Math.random() * canvas.width,
+                    y: 0,
+                    r: f.r,
+                    d: f.d
+                };
+            }
         }
     }
-}
 
-setInterval(drawSnow, 33);
+    setInterval(drawSnow, 33);
 
-// Carousel functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const slides = document.querySelectorAll('.carousel-slide');
-    const dots = document.querySelectorAll('.carousel-dots .dot');
-    let currentSlide = 0;
-    const slideInterval = 3000; // 3 seconds
+    // Carousel functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const slides = document.querySelectorAll('.carousel-slide');
+        const dots = document.querySelectorAll('.carousel-dots .dot');
+        let currentSlide = 0;
+        const slideInterval = 3000; // 3 seconds
 
-    function showSlide(index) {
-        // Remove active class from all slides and dots
-        slides.forEach(slide => slide.classList.remove('active'));
-        dots.forEach(dot => dot.classList.remove('active'));
-        
-        // Add active class to current slide and dot
-        slides[index].classList.add('active');
-        dots[index].classList.add('active');
-    }
+        function showSlide(index) {
+            // Remove active class from all slides and dots
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
 
-    function nextSlide() {
-        currentSlide = (currentSlide + 1) % slides.length;
-        showSlide(currentSlide);
-    }
+            // Add active class to current slide and dot
+            slides[index].classList.add('active');
+            dots[index].classList.add('active');
+        }
 
-    // Auto advance slides
-    let autoSlide = setInterval(nextSlide, slideInterval);
-
-    // Manual dot navigation
-    dots.forEach((dot, index) => {
-        dot.addEventListener('click', () => {
-            currentSlide = index;
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % slides.length;
             showSlide(currentSlide);
-            // Reset auto advance
+        }
+
+        // Auto advance slides
+        let autoSlide = setInterval(nextSlide, slideInterval);
+
+        // Manual dot navigation
+        dots.forEach((dot, index) => {
+            dot.addEventListener('click', () => {
+                currentSlide = index;
+                showSlide(currentSlide);
+                // Reset auto advance
+                clearInterval(autoSlide);
+                autoSlide = setInterval(nextSlide, slideInterval);
+            });
+        });
+
+        // Pause on hover
+        const carouselContainer = document.querySelector('.carousel-container');
+        carouselContainer.addEventListener('mouseenter', () => {
             clearInterval(autoSlide);
+        });
+
+        carouselContainer.addEventListener('mouseleave', () => {
             autoSlide = setInterval(nextSlide, slideInterval);
         });
     });
-
-    // Pause on hover
-    const carouselContainer = document.querySelector('.carousel-container');
-    carouselContainer.addEventListener('mouseenter', () => {
-        clearInterval(autoSlide);
-    });
-    
-    carouselContainer.addEventListener('mouseleave', () => {
-        autoSlide = setInterval(nextSlide, slideInterval);
-    });
-});
 </script>
 
 <?php
