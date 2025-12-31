@@ -207,31 +207,38 @@ $total_bookings = $conn->query("SELECT COUNT(*) as count FROM reservations")->fe
         <div class="carousel-slide">
             <img src="<?php echo SITE_URL; ?>/assets/images/luxury2-new.jpg" alt="Luxury Transport 2">
             <div class="carousel-overlay">
-                <h3>Interior Mewah</h3>
+                <h3>Interior Mewah</h4>
                 <p>Desain interior yang elegan dan modern</p>
             </div>
         </div>
         <div class="carousel-slide">
             <img src="<?php echo SITE_URL; ?>/assets/images/luxury3-new.jpg" alt="Luxury Transport 3">
             <div class="carousel-overlay">
-                <h3>Teknologi Terkini</h3>
+                <h3>Teknologi Terkini</h5>
                 <p>Dilengkapi dengan teknologi dan entertainment terbaru</p>
             </div>
         </div>
         <div class="carousel-slide">
             <img src="<?php echo SITE_URL; ?>/assets/images/luxury4.jpg" alt="Luxury Transport 4">
             <div class="carousel-overlay">
-                <h4>Best Experience</h4>
+                <h4>Best Experience</h6>
                 <p>Dapatkan pengalaman penumpang yang memuaskan</p>
             </div>
         </div>
-
+     <div class="carousel-slide">
+            <img src="<?php echo SITE_URL; ?>/assets/images/luxury5.jpg" alt="Luxury Transport 5">
+            <div class="carousel-overlay">
+                <h5>Luxurious Seats</h7>
+                <p>Dapatkan kursi yang nyaman, elegan dan bersih dalam bus AC luxurious</p>
+            </div>
+        </div>
         <!-- Navigation Dots -->
         <div class="carousel-dots">
             <span class="dot active" data-slide="0"></span>
             <span class="dot" data-slide="1"></span>
             <span class="dot" data-slide="2"></span>
             <span class="dot" data-slide="3"></span>
+              <span class="dot" data-slide="4"></span>
         </div>
     </div>
 </section>
